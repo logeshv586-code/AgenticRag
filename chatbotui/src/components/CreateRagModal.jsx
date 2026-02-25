@@ -33,20 +33,77 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState({
     urls: [''],
+    files: [],
     ragType: 'agentic',
     useCase: 'faq',
     vectorDb: 'pinecone',
     theme: THEMES[0].id
   });
+  const [isDeploying, setIsDeploying] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleNext = () => {
-    if (step < 3) setStep(step + 1);
-    else {
+  const handleNext = async () => {
+    if (step < 3) {
+      setStep(step + 1);
+    } else {
+      await handleDeploy();
+    }
+  };
+
+  const handleDeploy = async () => {
+    setIsDeploying(true);
+    let extractedTexts = [];
+
+    try {
+      const validUrls = config.urls.filter(u => u.trim());
+      if (validUrls.length > 0) {
+        const scrapeRes = await fetch('http://localhost:8000/api/scrape', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ urls: validUrls })
+        });
+        if (scrapeRes.ok) {
+          const data = await scrapeRes.json();
+          if (data.texts) extractedTexts.push(...data.texts);
+        }
+      }
+
+      for (const file of config.files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const uploadRes = await fetch('http://localhost:8000/api/upload', {
+          method: 'POST',
+          body: formData
+        });
+        if (uploadRes.ok) {
+          const data = await uploadRes.json();
+          if (data.text) extractedTexts.push(`Source: ${file.name}\n${data.text}`);
+        }
+      }
+
       const selectedTheme = THEMES.find(t => t.id === config.theme);
-      onComplete({ ...config, themeHue: selectedTheme.hue });
-      setStep(1); // Reset
+      const deployRes = await fetch('http://localhost:8000/api/deploy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extracted_texts: extractedTexts,
+          ragType: config.ragType,
+          useCase: config.useCase,
+          vectorDb: config.vectorDb,
+          theme: config.theme
+        })
+      });
+
+      if (deployRes.ok) {
+        const deployData = await deployRes.json();
+        onComplete({ ...config, themeHue: selectedTheme.hue, deployData });
+        setStep(1);
+      }
+    } catch (err) {
+      console.error("Deploy error:", err);
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -62,10 +119,24 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
     setConfig(prev => ({ ...prev, urls: nextUrls }));
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      const newFiles = Array.from(e.target.files);
+      setConfig(prev => ({ ...prev, files: [...prev.files, ...newFiles] }));
+    }
+  };
+
+  const removeFile = (idx) => {
+    setConfig(prev => ({
+      ...prev,
+      files: prev.files.filter((_, i) => i !== idx)
+    }));
+  };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in backdrop-blur-sm bg-black/50">
       <div className="absolute inset-0 bg-zinc-950/80" onClick={onClose} />
-      
+
       <div className="relative w-full max-w-2xl bg-[#0b0b0e] border border-cyan-500/20 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/10 flex flex-col h-[600px] animate-slide-up">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5">
@@ -87,13 +158,13 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
 
         {/* Form Body */}
         <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-zinc-800">
-          
+
           {step === 1 && (
             <div className="space-y-8 animate-fade-in">
               <div>
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <LinkIcon className="w-5 h-5 text-cyan-400" />
-                   Connect Data Sources
+                  Connect Data Sources
                 </h3>
                 <p className="text-sm text-zinc-400 mb-4">
                   Provide URLs to scrape. We will automatically embed and index this data.
@@ -101,13 +172,13 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                 <div className="space-y-3">
                   {config.urls.map((url, i) => (
                     <div key={i} className="flex gap-2">
-                       <input 
-                         type="text" 
-                         value={url}
-                         onChange={(e) => updateUrl(i, e.target.value)}
-                         placeholder="https://example.com/docs"
-                         className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition"
-                       />
+                      <input
+                        type="text"
+                        value={url}
+                        onChange={(e) => updateUrl(i, e.target.value)}
+                        placeholder="https://example.com/docs"
+                        className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-white placeholder-zinc-600 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition"
+                      />
                     </div>
                   ))}
                   <button onClick={addUrl} className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition flex items-center gap-1 mt-2">
@@ -119,15 +190,28 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               <div>
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <Upload className="w-5 h-5 text-cyan-400" />
-                   File Upload
+                  File Upload
                 </h3>
-                <div className="border-2 border-dashed border-zinc-800 hover:border-cyan-500/30 bg-zinc-900/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition cursor-pointer group">
+                <label className="border-2 border-dashed border-zinc-800 hover:border-cyan-500/30 bg-zinc-900/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition cursor-pointer group">
+                  <input type="file" multiple className="hidden" onChange={handleFileChange} />
                   <div className="w-12 h-12 rounded-full bg-zinc-800 group-hover:bg-cyan-500/20 flex items-center justify-center mb-3 transition">
                     <Upload className="w-6 h-6 text-zinc-400 group-hover:text-cyan-400 transition" />
                   </div>
                   <span className="text-sm font-medium text-white mb-1">Click to upload or drag and drop</span>
                   <span className="text-xs text-zinc-500">PDF, TXT, DOCX, CSV (max. 50MB)</span>
-                </div>
+                </label>
+                {config.files.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {config.files.map((f, i) => (
+                      <div key={i} className="flex items-center justify-between bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                        <span className="text-sm text-zinc-300 truncate pr-4">{f.name}</span>
+                        <button onClick={() => removeFile(i)} className="text-zinc-500 hover:text-red-400">
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -137,7 +221,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               <div>
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <LayoutTemplate className="w-5 h-5 text-cyan-400" />
-                   RAG Architecture & Persona
+                  RAG Architecture & Persona
                 </h3>
                 <div className="grid grid-cols-2 gap-3 mb-6">
                   {RAG_TYPES.map(type => (
@@ -171,7 +255,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               <div>
                 <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-4">
                   <Database className="w-5 h-5 text-cyan-400" />
-                   Vector Database
+                  Vector Database
                 </h3>
                 <div className="flex gap-3">
                   {VECTORDBS.map(db => (
@@ -193,7 +277,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               <div className="text-center mb-8">
                 <Palette className="w-12 h-12 text-cyan-400 mx-auto mb-4 opacity-80" />
                 <h3 className="text-2xl font-bold text-white mb-2">
-                   Brand Your Assistant
+                  Brand Your Assistant
                 </h3>
                 <p className="text-sm text-zinc-400 max-w-sm mx-auto">
                   Select a thematic color that fits your enterprise's visual identity.
@@ -209,7 +293,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                       onClick={() => updateConfig('theme', theme.id)}
                       className={`flex flex-col items-center p-4 rounded-2xl border transition group ${isSelected ? 'bg-white/5 border-white ring-2 ring-white/20 scale-105' : 'bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700'}`}
                     >
-                      <div 
+                      <div
                         className={`w-12 h-12 rounded-full mb-3 shadow-lg transition-transform ${isSelected ? 'scale-110' : 'group-hover:scale-110'}`}
                         style={{ backgroundColor: theme.color, boxShadow: `0 0 20px ${theme.color}66` }}
                       />
@@ -232,12 +316,13 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               <div key={i} className={`h-1.5 rounded-full transition-all duration-300 ${step >= i ? 'w-8 bg-cyan-400' : 'w-4 bg-zinc-800'}`} />
             ))}
           </div>
-          <button 
+          <button
             onClick={handleNext}
-            className="px-6 py-2.5 bg-cyan-400 hover:bg-cyan-300 text-black font-semibold rounded-full flex items-center gap-2 transition hover:scale-105 active:scale-95"
+            disabled={isDeploying}
+            className={`px-6 py-2.5 ${isDeploying ? 'bg-zinc-800 text-zinc-500' : 'bg-cyan-400 hover:bg-cyan-300 text-black'} font-semibold rounded-full flex items-center gap-2 transition hover:scale-105 active:scale-95`}
           >
-            {step === 3 ? 'Deploy RAG' : 'Next Step'}
-            <ChevronRight className="w-4 h-4" />
+            {isDeploying ? 'Deploying...' : step === 3 ? 'Deploy RAG' : 'Next Step'}
+            {!isDeploying && <ChevronRight className="w-4 h-4" />}
           </button>
         </div>
       </div>
