@@ -1,0 +1,84 @@
+/* Container */
+.glass-icons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+  margin: 24px 0 8px;
+}
+
+/* Card */
+.glass-icon {
+  position: relative;
+  height: 110px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.06);
+  background: rgba(18, 18, 23, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 10px 24px rgba(0,0,0,0.35);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 180ms ease;
+  backdrop-filter: saturate(1.2) blur(14px);
+}
+.glass-icon:hover {
+  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04), 0 18px 36px rgba(0,0,0,0.45);
+}
+
+.glass-icon-bg {
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+}
+.glass-icon-blur {
+  position: absolute;
+  inset: -20%;
+  filter: blur(24px);
+  background: radial-gradient(40% 60% at 50% 40%, rgba(255,255,255,0.08), transparent);
+}
+
+.glass-icon-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-icon-shine {
+  position: absolute;
+  top: -30%;
+  left: -30%;
+  width: 160%;
+  height: 160%;
+  background: radial-gradient(80% 80% at 20% 20%, rgba(255,255,255,0.08), transparent);
+  mix-blend-mode: screen;
+}
+.glass-icon-ring {
+  position: absolute;
+  inset: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 0 1px rgba(255,255,255,0.35) inset;
+}
+
+.glass-icon-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.glass-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 2px solid currentColor;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
+}
+.glass-icon-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+}
