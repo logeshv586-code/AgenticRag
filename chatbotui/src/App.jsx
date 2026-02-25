@@ -5,6 +5,7 @@ import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
 import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
+import CreateRagModal from './components/CreateRagModal';
 
 const INITIAL_MESSAGES = [
   {
@@ -14,7 +15,7 @@ const INITIAL_MESSAGES = [
   }
 ];
 
- 
+
 
 function App() {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
@@ -27,7 +28,10 @@ function App() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const streamRef = useRef(null);
- 
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
+
   const ragTypes = [
     { key: 'basic_rag', title: 'Basic RAG', icon: Search, short: 'Embed, retrieve Top‑K, answer with citations.', works: ['Split text to chunks', 'Embed into vectors', 'Search Top‑K', 'Generate with context'], canDo: ['FAQs', 'General Q&A'], query: 'Explain basic RAG workflow' },
     { key: 'hybrid_rag', title: 'Hybrid RAG', icon: Wand2, short: 'Combine keyword and vector search for recall and precision.', works: ['BM25 + vector search', 'Weighted scoring', 'Deduplicate and rank'], canDo: ['Docs with exact terms', 'Codebases'], query: 'How does hybrid RAG improve retrieval?' },
@@ -65,7 +69,7 @@ function App() {
     }
   }, [messages, isOpen]);
 
- 
+
   useEffect(() => {
     const w = typeof window !== 'undefined' ? window : null;
     const SR = w && (w.SpeechRecognition || w.webkitSpeechRecognition);
@@ -244,14 +248,17 @@ function App() {
           <p className="text-center text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed">
             Build branded AI assistants and RAG-powered pages in minutes. No code. Secure by design. Tailored to Prime Source Global content.
           </p>
-          <div className="flex items-center justify-center mt-8">
-            <a href="#solutions" className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#22d3ee] text-black font-semibold hover:scale-105 transition">
-              <MessageCircle className="w-5 h-5" />
-              Start Building
-            </a>
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition active:scale-95"
+            >
+              <Wand2 className="w-5 h-5" />
+              Build Custom RAG
+            </button>
           </div>
         </div>
-        <div className="px-8 max-w-7xl mx-auto">
+        <div className="px-8 max-w-7xl mx-auto mt-6">
           <GlassIcons onSelect={(it) => {
             const byTitle = (arr, t) => arr.find(x => x.title === t);
             const map = {
@@ -283,7 +290,7 @@ function App() {
             }
           }} />
         </div>
- 
+
         <div id="solutions" className="px-8 py-8 max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl md:text-3xl font-bold">RAG Types</h2>
@@ -336,7 +343,7 @@ function App() {
             })}
           </div>
         </div>
- 
+
       </div>
 
       {selected && (
@@ -403,27 +410,27 @@ function App() {
 
       <div className={`fixed bottom-6 right-6 z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
         <div className="w-[380px] h-[600px] bg-[#09090b] text-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-zinc-800 ring-1 ring-black/5">
-          
+
           <div className="flex items-center justify-between px-4 py-3 bg-[#09090b] border-b border-zinc-800">
             <div className="flex items-center gap-3">
-               <div className="scale-75 origin-left">
-                  <MiniRobot />
-               </div>
-               <div>
-                  <h3 className="text-[15px] font-semibold">Chat with AI Bot</h3>
-                  <div className="flex items-center gap-1.5">
-                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                     <span className="text-[11px] text-zinc-400">Online</span>
-                  </div>
-               </div>
+              <div className="scale-75 origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                <MiniRobot />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-semibold">Chat with AI Bot</h3>
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                  <span className="text-[11px] text-zinc-400">Online</span>
+                </div>
+              </div>
             </div>
             <div className="flex items-center gap-1">
-               <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
-                  <Minus className="w-5 h-5" />
-               </button>
-               <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
-                  <X className="w-5 h-5" />
-               </button>
+              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
+                <Minus className="w-5 h-5" />
+              </button>
+              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
+                <X className="w-5 h-5" />
+              </button>
             </div>
           </div>
 
@@ -439,43 +446,43 @@ function App() {
                   </div>
                 ) : (
                   <div className="flex gap-3 max-w-[90%] animate-fade-in">
-                     <div className="w-10 h-10 flex-shrink-0 -ml-1">
-                        <div className="scale-[0.6] origin-top-left">
-                            <MiniRobot />
-                        </div>
-                     </div>
-                     <div className="flex flex-col gap-2">
-                        <div className="bg-[#1c1c1e] p-3 rounded-2xl rounded-tl-sm border border-zinc-800/50 text-zinc-200 text-[14px] leading-6 font-normal">
-                          {msg.content}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                            <ThumbsUp className="w-3.5 h-3.5" />
-                          </button>
-                          <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                            <ThumbsDown className="w-3.5 h-3.5" />
-                          </button>
-                          <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                     </div>
+                    <div className="w-10 h-10 flex-shrink-0 -ml-1">
+                      <div className="scale-[0.6] origin-top-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                        <MiniRobot />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <div className="bg-[#1c1c1e] p-3 rounded-2xl rounded-tl-sm border border-zinc-800/50 text-zinc-200 text-[14px] leading-6 font-normal">
+                        {msg.content}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
+                          <ThumbsDown className="w-3.5 h-3.5" />
+                        </button>
+                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
             ))}
-            
+
             {isLoading && (
               <div className="flex justify-start animate-message-in">
                 <div className="flex gap-3 max-w-[90%] animate-fade-in">
-                   <div className="flex flex-col gap-2">
-                      <div className="bg-gradient-to-br from-[#121214] to-[#1a1a1f]/90 backdrop-blur-sm p-4 rounded-2xl rounded-tl-md border border-white/10 shadow-xl ring-1 ring-cyan-500/10 flex items-center gap-5">
-                        <div className="scale-75 origin-left">
-                           <WaitingRobot />
-                        </div>
-                        <span className="text-zinc-300 text-sm tracking-wide animate-pulse">Request from PSG is coming...</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="bg-gradient-to-br from-[#121214] to-[#1a1a1f]/90 backdrop-blur-sm p-4 rounded-2xl rounded-tl-md border border-white/10 shadow-xl ring-1 ring-cyan-500/10 flex items-center gap-5">
+                      <div className="scale-75 origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                        <WaitingRobot />
                       </div>
-                   </div>
+                      <span className="text-zinc-300 text-sm tracking-wide animate-pulse">Request from PSG is coming...</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -484,56 +491,72 @@ function App() {
 
           <div className="p-4 bg-[#09090b] border-t border-zinc-800">
             <div className="flex items-center gap-2 bg-[#1c1c1e] p-1.5 pl-3 pr-1.5 rounded-[24px] border border-zinc-800/50 focus-within:border-zinc-700 transition duration-300">
-               <button className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 transition">
-                  <LayoutGrid className="w-5 h-5" strokeWidth={1.5} />
-               </button>
-               
-               <input 
-                  type="text" 
-                  placeholder="Type message..." 
-                  className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px]"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-               />
-              <button 
-                 onClick={toggleListening}
-                 className={`px-3 py-2 rounded-full border ${isListening ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-zinc-700 bg-zinc-900 text-zinc-300'}`}
+              <button className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 transition">
+                <LayoutGrid className="w-5 h-5" strokeWidth={1.5} />
+              </button>
+
+              <input
+                type="text"
+                placeholder="Type message..."
+                className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px]"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+              />
+              <button
+                onClick={toggleListening}
+                className={`px-3 py-2 rounded-full border ${isListening ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-zinc-700 bg-zinc-900 text-zinc-300'}`}
               >
                 <div className="flex items-center gap-2">
                   <Mic className="w-4 h-4" />
                   <span className="text-sm">{isListening ? 'Listening' : 'Voice'}</span>
                 </div>
               </button>
-               
-               <button 
-                  onClick={handleSend}
-                  disabled={!inputValue.trim()}
-                  className={`p-2 rounded-full transition-all duration-300 ${inputValue.trim() ? 'bg-[#22d3ee] text-black rotate-0' : 'bg-transparent text-zinc-600 rotate-90'}`}
-               >
-                  <Send className="w-4 h-4" fill={inputValue.trim() ? "currentColor" : "none"} />
-               </button>
+
+              <button
+                onClick={handleSend}
+                disabled={!inputValue.trim()}
+                className={`p-2 rounded-full transition-all duration-300 ${inputValue.trim() ? 'bg-[#22d3ee] text-black rotate-0' : 'bg-transparent text-zinc-600 rotate-90'}`}
+              >
+                <Send className="w-4 h-4" fill={inputValue.trim() ? "currentColor" : "none"} />
+              </button>
             </div>
             <div className="text-center mt-2 text-[10px] text-zinc-500">
-               AI can make mistakes.
+              AI can make mistakes.
             </div>
           </div>
         </div>
       </div>
 
-      <div 
+      <div
         className={`fixed bottom-6 right-6 transition-all duration-300 z-40 ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
+        style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}
       >
         <Robot3D onClick={() => setIsOpen(true)} notificationCount={1} />
       </div>
 
-       <button 
+      <button
         onClick={() => setIsOpen(false)}
         className={`fixed bottom-6 right-6 p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 z-40 bg-zinc-800 text-white ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}
       >
         <X className="w-7 h-7" />
       </button>
 
+      <CreateRagModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onComplete={(config) => {
+          setRagConfig(config);
+          setIsCreateModalOpen(false);
+          const msg = {
+            id: Date.now(),
+            role: 'bot',
+            content: `Your ${config.ragType.toUpperCase()} RAG for ${config.useCase} using ${config.vectorDb} is successfully deployed! How can I help you today?`
+          };
+          setMessages([msg]);
+          setIsOpen(true);
+        }}
+      />
     </div>
   );
 }

@@ -1,0 +1,39 @@
+# Python FastAPI Backend Implementation Plan
+
+## Goal Description
+Build a Python backend using FastAPI to support the Agentic RAG Creation UI. The backend will handle processing data sources (scraping websites, reading uploaded documents), use a local LLM to converse with the user and determine the RAG configuration (e.g., Pinecone, ChromaDB), and finally create and deploy the customized RAG system.
+
+## Proposed Changes
+
+### 1. Project Setup
+#### [NEW] `backend/requirements.txt`(file:///c:/Users/e629/Documents/AgenticRag/backend/requirements.txt)
+- `fastapi`, `uvicorn`, `pydantic`, `python-multipart`
+- `langchain`, `langchain-community`, `beautifulsoup4` (for scraping)
+- `pdfplumber` or `PyPDF2` (for document reading)
+- `pinecone-client`, `chromadb` (Vector DBs)
+
+#### [NEW] `backend/main.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/main.py)
+- Set up FastAPI app with CORS middleware.
+- Implement endpoints:
+  - `POST /api/scrape`: Accepts URLs, uses BeautifulSoup/Langchain loaders to extract text, and splits into chunks.
+  - `POST /api/upload`: Accepts file uploads (PDF, TXT, DOCX), extracts text, and prepares it for embeddings.
+  - `POST /api/chat`: Interacts with a local LLM to guide the user in selecting RAG features (Vector DB, Persona, Architecture) and answer questions about RAG types.
+  - `POST /api/deploy`: Takes the parsed documents/URLs and chosen configuration, embeds the data, stores it in the selected Vector DB (Pinecone, ChromaDB), and returns the final RAG endpoint details.
+
+### 2. File / Module Structure
+#### [NEW] `backend/services/scraper.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/scraper.py)
+Logic for web scraping and text extraction.
+
+#### [NEW] `backend/services/document_parser.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/document_parser.py)
+Logic for reading uploaded files.
+
+#### [NEW] `backend/services/rag_builder.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/rag_builder.py)
+Logic to initialize the specified Vector DB, embed the processed text, and configure the conversational chain.
+
+## Verification Plan
+### Manual Verification
+- Start the FastAPI server (`uvicorn main:app --reload`).
+- Test `/api/scrape` with a sample URL via Swagger UI (`/docs`).
+- Test `/api/upload` by uploading a PDF file.
+- Test `/api/chat` to ensure the local LLM logic provides appropriate responses regarding RAG configuration.
+- Trigger the frontend creation flow and verify it successfully hits the `/api/deploy` endpoint to initialize the RAG.

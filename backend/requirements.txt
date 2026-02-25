@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+python-multipart
+langchain
+langchain-community
+beautifulsoup4
+pdfplumber
+pinecone-client
+chromadb
+openai
+sentence-transformers
+requests
