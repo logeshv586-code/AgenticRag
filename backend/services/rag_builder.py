@@ -1,27 +1,29 @@
 import uuid
+from .haystack_service import build_and_deploy_pipeline
 
-def deploy_rag_system(texts, rag_type, use_case, vector_db):
+def deploy_rag_system(texts, rag_type, use_case, vector_db, features=None):
     """
-    Mock logic for building the Vector DB and returning an endpoint URL.
-    In a real implementation, this would:
-    1. Chunk the texts via Langchain Splitters.
-    2. Map to a vector database (Pinecone/Chroma/Milvus).
-    3. Generate embeddings using an LLM model.
-    4. Provide the search endpoint.
+    Deploys the RAG system using Haystack 2.0 orchestration.
     """
-    total_length = sum(len(t) for t in texts)
+    features = features or []
     
-    # Generate mock deployment data
-    deployment_id = str(uuid.uuid4())
-    endpoint = f"http://localhost:8000/api/rag/{deployment_id}/query"
+    pipeline_id, pipeline = build_and_deploy_pipeline(
+        texts=texts,
+        rag_type=rag_type,
+        use_case=use_case,
+        vector_db=vector_db,
+        features=features
+    )
+    
+    endpoint = f"http://localhost:8000/api/rag/{pipeline_id}/query"
     
     response = {
-        "rag_id": deployment_id,
+        "pipeline_id": pipeline_id,
         "type": rag_type,
         "use_case": use_case,
         "vector_database": vector_db,
         "documents_processed": len(texts),
-        "total_characters": total_length,
+        "total_characters": sum(len(t) for t in texts),
         "query_endpoint": endpoint
     }
     

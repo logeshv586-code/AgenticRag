@@ -11,3 +11,5 @@ chromadb
 openai
 sentence-transformers
 requests
+haystack-ai
+haystack-experimental

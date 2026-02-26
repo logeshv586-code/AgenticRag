@@ -11,7 +11,12 @@ const INITIAL_MESSAGES = [
   {
     id: 1,
     role: 'bot',
-    content: 'Hello! I am the Prime Source Global assistant. How can I help you today?',
+    content: 'Hello! I am your RAG architecture guide, powered by the local Qwen model. How can I help you today?',
+    suggestions: [
+      { id: 'build', label: 'Build a Custom RAG' },
+      { id: 'explain', label: 'Explain RAG Types' },
+      { id: 'eratimbers', label: 'Test EraTimbers Demo RAG' }
+    ]
   }
 ];
 
@@ -171,7 +176,8 @@ function App() {
     setInputValue('');
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/chat', {
+      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || 'http://localhost:8000/api/test-chat';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: text }),
@@ -196,6 +202,36 @@ function App() {
       setMessages(prev => [...prev, errorMsg]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSuggestionClick = async (suggestionId) => {
+    if (suggestionId === 'build') {
+      setIsCreateModalOpen(true);
+      setIsOpen(false);
+    } else if (suggestionId === 'explain') {
+      handleSend("Can you explain the different types of RAG architectures available?");
+    } else if (suggestionId === 'eratimbers') {
+      const userMsg = { id: Date.now(), role: 'user', content: 'Trigger Era Timbers Demo RAG' };
+      setMessages(prev => [...prev, userMsg]);
+      setIsLoading(true);
+      try {
+        const response = await fetch('http://localhost:8000/api/demo/eratimbers', { method: 'POST' });
+        if (!response.ok) throw new Error('Demo failed');
+        const data = await response.json();
+
+        setRagConfig({ deployData: data });
+        const botMsg = {
+          id: Date.now() + 1,
+          role: 'bot',
+          content: `✅ Successfully scraped eratimbers.com and deployed a Hybrid RAG using the local Qwen model! You are now chatting with the deployed pipeline. Ask me anything about Era Timbers products (e.g. "What timber types are available?").`
+        };
+        setMessages(prev => [...prev, botMsg]);
+      } catch (error) {
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', content: "Failed to deploy Era Timbers Demo." }]);
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   const openModal = (type, item) => {
@@ -455,6 +491,21 @@ function App() {
                       <div className="bg-[#1c1c1e] p-3 rounded-2xl rounded-tl-sm border border-zinc-800/50 text-zinc-200 text-[14px] leading-6 font-normal">
                         {msg.content}
                       </div>
+
+                      {msg.suggestions && (
+                        <div className="flex flex-col gap-2 mt-1 w-full max-w-[280px]">
+                          {msg.suggestions.map(s => (
+                            <button
+                              key={s.id}
+                              onClick={() => handleSuggestionClick(s.id)}
+                              className="px-4 py-2 text-sm text-left bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300"
+                            >
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-1">
                         <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
                           <ThumbsUp className="w-3.5 h-3.5" />
