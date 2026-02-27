@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play } from 'lucide-react';
+import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers } from 'lucide-react';
 import RagVisualizer from './RagVisualizer';
 import RagChatTester from './RagChatTester';
 
@@ -258,8 +258,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                     key={type.id}
                     onClick={() => updateConfig('ragType', type.id)}
                     className={`p-5 rounded-2xl border text-left transition group ${config.ragType === type.id
-                        ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
-                        : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                      ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                       }`}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -288,8 +288,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                     key={use.id}
                     onClick={() => updateConfig('useCase', use.id)}
                     className={`p-4 rounded-xl border text-center transition ${config.useCase === use.id
-                        ? 'bg-white/10 border-white/30 text-white shadow-lg'
-                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                      ? 'bg-white/10 border-white/30 text-white shadow-lg'
+                      : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
                       }`}
                   >
                     <span className="text-sm font-medium">{use.name}</span>
@@ -312,8 +312,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                     key={db.id}
                     onClick={() => updateConfig('vectorDb', db.id)}
                     className={`p-4 rounded-xl border flex items-center justify-between transition ${config.vectorDb === db.id
-                        ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-zinc-600 text-white shadow-lg'
-                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-300'
+                      ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-zinc-600 text-white shadow-lg'
+                      : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-300'
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -342,8 +342,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                       key={feat.id}
                       onClick={() => toggleFeature(feat.id)}
                       className={`p-4 rounded-xl border flex items-center justify-between transition ${isActive
-                          ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                          : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700'
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700'
                         }`}
                     >
                       <span className="text-sm font-medium">{feat.name}</span>
@@ -386,8 +386,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                 <button
                   onClick={() => updateConfig('deploymentType', 'api')}
                   className={`p-6 rounded-2xl border text-left flex flex-col items-start transition ${config.deploymentType === 'api'
-                      ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                    ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
+                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                     }`}
                 >
                   <Globe className={`w-8 h-8 mb-4 ${config.deploymentType === 'api' ? 'text-cyan-400' : 'text-zinc-500'}`} />
@@ -398,8 +398,8 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                 <button
                   onClick={() => updateConfig('deploymentType', 'offline')}
                   className={`p-6 rounded-2xl border text-left flex flex-col items-start transition ${config.deploymentType === 'offline'
-                      ? 'bg-purple-500/10 border-purple-500/50 ring-1 ring-purple-500/50'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                    ? 'bg-purple-500/10 border-purple-500/50 ring-1 ring-purple-500/50'
+                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                     }`}
                 >
                   <Code className={`w-8 h-8 mb-4 ${config.deploymentType === 'offline' ? 'text-purple-400' : 'text-zinc-500'}`} />
