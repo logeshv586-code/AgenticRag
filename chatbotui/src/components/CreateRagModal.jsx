@@ -627,7 +627,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                 <Layers className="w-5 h-5 text-cyan-400" /> Architecture Graph
               </h3>
               <p className="text-sm text-zinc-400 mb-4 shrink-0">Visual summary of your configured multi-agent system.</p>
-              <div className="flex-1 min-h-[300px] border border-zinc-800 rounded-2xl overflow-hidden shadow-inner bg-zinc-950/50 relative">
+              <div className="flex-1 min-h-[300px] border border-zinc-800 rounded-2xl overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 shadow-inner bg-zinc-950/50 relative">
                 <RagVisualizer config={config} />
               </div>
             </div>

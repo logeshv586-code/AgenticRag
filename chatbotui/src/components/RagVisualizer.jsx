@@ -5,7 +5,7 @@ export default function RagVisualizer({ config }) {
     const { ragType, vectorDb, useCase, features } = config;
 
     return (
-        <div className="flex flex-col items-center justify-center space-y-8 p-6 animate-fade-in w-full">
+        <div className="flex flex-col items-center justify-start space-y-8 p-6 animate-fade-in w-full min-h-max">
             <h3 className="text-xl font-bold text-white mb-2">Architecture Preview</h3>
 
             <div className="flex flex-col items-center space-y-4 relative w-full max-w-md">
