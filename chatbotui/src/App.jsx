@@ -35,6 +35,7 @@ function App() {
   const streamRef = useRef(null);
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [initialCreateConfig, setInitialCreateConfig] = useState(null);
   const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
 
   const ragTypes = [
@@ -286,7 +287,7 @@ function App() {
           </p>
           <div className="flex justify-center mt-8">
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={() => { setInitialCreateConfig(null); setIsCreateModalOpen(true); }}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition active:scale-95"
             >
               <Wand2 className="w-5 h-5" />
@@ -427,14 +428,28 @@ function App() {
                   </div>
                 </div>
               )}
+              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-800">
+                <button
+                  onClick={() => {
+                    setInitialCreateConfig({ ragType: selected.item.key, useCase: selected.type === 'assistant' ? selected.item.key : '' });
+                    setIsCreateModalOpen(true);
+                    closeModal();
+                  }}
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#22d3ee] to-blue-500 text-white font-bold hover:scale-[1.02] transition active:scale-95"
+                >
+                  <Wand2 className="w-5 h-5" />
+                  Create this RAG
+                </button>
+              </div>
+
               <div className="flex items-center gap-3">
                 {selected.item.query && (
-                  <button onClick={() => applySampleQuery(selected.item.query)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#22d3ee] text-black font-semibold">
+                  <button onClick={() => applySampleQuery(selected.item.query)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 hover:text-white transition">
                     <MessageCircle className="w-4 h-4" />
                     Try sample query
                   </button>
                 )}
-                <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-200">
+                <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition text-sm">
                   <Bot className="w-4 h-4" />
                   Open chat
                 </button>
@@ -595,6 +610,7 @@ function App() {
 
       <CreateRagModal
         isOpen={isCreateModalOpen}
+        initialConfig={initialCreateConfig}
         onClose={() => setIsCreateModalOpen(false)}
         onComplete={(config) => {
           setRagConfig(config);

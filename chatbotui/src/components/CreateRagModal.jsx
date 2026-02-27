@@ -1,26 +1,46 @@
 import React, { useState } from 'react';
 import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers } from 'lucide-react';
 import RagVisualizer from './RagVisualizer';
-import RagChatTester from './RagChatTester';
+
+const DB_TYPES = [
+  { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.' },
+  { id: 'local', name: 'Local Vector DB', desc: 'Self-hosted, private databases.' },
+  { id: 'hybrid', name: 'Hybrid DB', desc: 'Combine both cloud and local storage.' },
+];
+
+const CLOUD_DBS = [
+  { id: 'pinecone', name: 'Pinecone' },
+  { id: 'weaviate', name: 'Weaviate' },
+  { id: 'milvus', name: 'Milvus' }
+];
+
+const LOCAL_DBS = [
+  { id: 'chroma', name: 'ChromaDB' },
+  { id: 'faiss', name: 'FAISS' }
+];
 
 const RAG_TYPES = [
-  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic.' },
-  { id: 'hybrid', name: 'Hybrid RAG', desc: 'Combines dense + sparse retrieval.' },
+  { id: 'basic', name: 'Basic RAG', desc: 'Standard vector similarity search.' },
   { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history.' },
-  { id: 'basic', name: 'Basic Semantic RAG', desc: 'Standard vector similarity search.' },
+  { id: 'multimodal', name: 'Multimodal RAG', desc: 'Handles text, images, and audio.' },
+  { id: 'structured', name: 'Structured/Graph RAG', desc: 'Retrieves from structured data or Knowledge Graphs.' },
+  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic.' },
+  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds.' },
+  { id: 'personalized', name: 'Personalized RAG', desc: 'Adapts to user-specific memory and preferences.' },
+  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across languages.' },
+  { id: 'voice', name: 'Voice-Ready RAG', desc: 'Speech-to-text input and spoken output.' },
+  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources for answers.' },
 ];
 
-const USE_CASES = [
-  { id: 'faq', name: 'FAQ Bot' },
-  { id: 'support', name: 'Customer Support' },
-  { id: 'sales', name: 'Sales Assistant' },
-  { id: 'hr', name: 'HR / Internal Docs' },
+const LLM_MODELS = [
+  { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private computing.' },
+  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.' },
+  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.' }
 ];
 
-const VECTORDBS = [
-  { id: 'pinecone', name: 'Pinecone' },
-  { id: 'chroma', name: 'ChromaDB' },
-  { id: 'inmemory', name: 'In-Memory Store' },
+const EMBEDDING_MODELS = [
+  { id: 'bge-local', name: 'Local BGE-m3', desc: 'Offline, dense embeddings.' },
+  { id: 'openai-ada', name: 'OpenAI text-embedding-ada-002', desc: 'Cloud standard.' },
 ];
 
 const FEATURES = [
@@ -38,28 +58,59 @@ const THEMES = [
   { id: 'gold', name: 'Luxury Gold', hue: 45, color: '#fbbf24' },
 ];
 
-export default function CreateRagModal({ isOpen, onClose, onComplete }) {
+export default function CreateRagModal({ isOpen, onClose, onComplete, initialConfig }) {
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState({
+    // Step 1: Data
     urls: [''],
     files: [],
+
+    // Step 2: DB Selection
+    dbType: 'cloud',
+    cloudDb: 'pinecone',
+    localDb: 'chroma',
+
+    // Step 3: Architecture
     ragType: 'agentic',
-    useCase: 'faq',
-    vectorDb: 'pinecone',
+
+    // Step 4: Dynamic Config
+    dynamicConfig: {},
+
+    // Step 5: Models
+    llmModel: 'qwen-local',
+    embeddingModel: 'bge-local',
+
+    // Step 6: Advanced Tuning
+    chunkSize: 500,
+    topK: 5,
+    useReranker: false,
+
+    // Step 7: Features & Theme
     features: [],
     theme: THEMES[0].id,
+
+    // Step 9: Deployment Type
     deploymentType: 'api'
   });
   const [deployData, setDeployData] = useState(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployProgress, setDeployProgress] = useState(0);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialConfig?.ragType) {
+        setConfig(prev => ({ ...prev, ragType: initialConfig.ragType }));
+      }
+      setStep(1);
+    }
+  }, [isOpen, initialConfig]);
+
   if (!isOpen) return null;
 
-  const totalSteps = 9;
+  const totalSteps = 10;
 
   const handleNext = async () => {
-    if (step === 7) {
+    if (step === 9) {
       await handleDeploy();
     } else if (step < totalSteps) {
       setStep(step + 1);
@@ -80,8 +131,16 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
     });
   };
 
+  const toggleDynamicConfig = (key, value) => {
+    setConfig(prev => {
+      const current = prev.dynamicConfig[key] || [];
+      const newValues = current.includes(value) ? current.filter(v => v !== value) : [...current, value];
+      return { ...prev, dynamicConfig: { ...prev.dynamicConfig, [key]: newValues } };
+    });
+  };
+
   const handleDeploy = async () => {
-    setStep(8); // Move to deployment status step
+    setStep(10); // Move to deployment status step
     setIsDeploying(true);
     setDeployProgress(10);
 
@@ -123,8 +182,15 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
         body: JSON.stringify({
           extracted_texts: extractedTexts,
           ragType: config.ragType,
-          useCase: config.useCase,
-          vectorDb: config.vectorDb,
+          dbType: config.dbType,
+          cloudDb: config.cloudDb,
+          localDb: config.localDb,
+          dynamicConfig: config.dynamicConfig,
+          llmModel: config.llmModel,
+          embeddingModel: config.embeddingModel,
+          chunkSize: config.chunkSize,
+          topK: config.topK,
+          useReranker: config.useReranker,
           theme: config.theme,
           features: config.features,
           deploymentType: config.deploymentType
@@ -248,29 +314,69 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
           {step === 2 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <LayoutTemplate className="w-5 h-5 text-cyan-400" /> Architecture Selection
+                <Database className="w-5 h-5 text-cyan-400" /> Vector Database & Storage
               </h3>
-              <p className="text-sm text-zinc-400 mb-6">Choose the foundational Haystack topology for your Assistant.</p>
+              <p className="text-sm text-zinc-400 mb-6">Select where your embeddings will be stored and queried.</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {RAG_TYPES.map(type => (
+              {/* Deployment Location (Cloud vs Local vs Hybrid) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                {DB_TYPES.map(type => (
                   <button
                     key={type.id}
-                    onClick={() => updateConfig('ragType', type.id)}
-                    className={`p-5 rounded-2xl border text-left transition group ${config.ragType === type.id
+                    onClick={() => updateConfig('dbType', type.id)}
+                    className={`p-4 rounded-xl border text-left transition group ${config.dbType === type.id
                       ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
                       : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                       }`}
                   >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`font-semibold ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
+                    <div className="flex justify-between items-start mb-1">
+                      <span className={`font-semibold text-sm ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
                         {type.name}
                       </span>
-                      {config.ragType === type.id && <Check className="w-5 h-5 text-cyan-400" />}
+                      {config.dbType === type.id && <Check className="w-4 h-4 text-cyan-400" />}
                     </div>
-                    <p className="text-sm text-zinc-500">{type.desc}</p>
+                    <p className="text-xs text-zinc-500">{type.desc}</p>
                   </button>
                 ))}
+              </div>
+
+              {/* Specific DB Selection based on dbType */}
+              <div className="space-y-4">
+                {(config.dbType === 'cloud' || config.dbType === 'hybrid') && (
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-300 mb-3">Cloud Provider</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {CLOUD_DBS.map(db => (
+                        <button
+                          key={db.id}
+                          onClick={() => updateConfig('cloudDb', db.id)}
+                          className={`p-3 rounded-lg border text-center transition ${config.cloudDb === db.id ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-white'
+                            }`}
+                        >
+                          <span className="text-sm">{db.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(config.dbType === 'local' || config.dbType === 'hybrid') && (
+                  <div>
+                    <h4 className="text-sm font-medium text-zinc-300 mb-3 mt-4">Local Provider</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      {LOCAL_DBS.map(db => (
+                        <button
+                          key={db.id}
+                          onClick={() => updateConfig('localDb', db.id)}
+                          className={`p-3 rounded-lg border text-center transition ${config.localDb === db.id ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-white'
+                            }`}
+                        >
+                          <span className="text-sm">{db.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -278,21 +384,27 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
           {step === 3 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <User className="w-5 h-5 text-cyan-400" /> Persona Selection
+                <LayoutTemplate className="w-5 h-5 text-cyan-400" /> Architecture Selection
               </h3>
-              <p className="text-sm text-zinc-400 mb-6">How should the AI behave and structure its answers?</p>
+              <p className="text-sm text-zinc-400 mb-6">Choose the foundational Haystack topology for your Assistant.</p>
 
-              <div className="grid grid-cols-2 gap-4">
-                {USE_CASES.map(use => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                {RAG_TYPES.map(type => (
                   <button
-                    key={use.id}
-                    onClick={() => updateConfig('useCase', use.id)}
-                    className={`p-4 rounded-xl border text-center transition ${config.useCase === use.id
-                      ? 'bg-white/10 border-white/30 text-white shadow-lg'
-                      : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700'
+                    key={type.id}
+                    onClick={() => updateConfig('ragType', type.id)}
+                    className={`p-4 rounded-xl border text-left transition group ${config.ragType === type.id
+                      ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
+                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
                       }`}
                   >
-                    <span className="text-sm font-medium">{use.name}</span>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className={`font-semibold text-sm ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
+                        {type.name}
+                      </span>
+                      {config.ragType === type.id && <Check className="w-4 h-4 text-cyan-400" />}
+                    </div>
+                    <p className="text-xs text-zinc-500">{type.desc}</p>
                   </button>
                 ))}
               </div>
@@ -302,27 +414,64 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
           {step === 4 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <Database className="w-5 h-5 text-cyan-400" /> Vector Database
+                <Settings2 className="w-5 h-5 text-cyan-400" /> Dynamic Configuration
               </h3>
-              <p className="text-sm text-zinc-400 mb-6">Select the document store for embedding retrieval.</p>
+              <p className="text-sm text-zinc-400 mb-6">Customize specific settings for your {RAG_TYPES.find(r => r.id === config.ragType)?.name || 'Pipeline'}.</p>
 
-              <div className="flex flex-col gap-3">
-                {VECTORDBS.map(db => (
-                  <button
-                    key={db.id}
-                    onClick={() => updateConfig('vectorDb', db.id)}
-                    className={`p-4 rounded-xl border flex items-center justify-between transition ${config.vectorDb === db.id
-                      ? 'bg-gradient-to-r from-zinc-800 to-zinc-900 border-zinc-600 text-white shadow-lg'
-                      : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-zinc-300'
-                      }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Server className={`w-5 h-5 ${config.vectorDb === db.id ? 'text-cyan-400' : 'text-zinc-600'}`} />
-                      <span className="font-medium">{db.name}</span>
+              <div className="space-y-4">
+                {config.ragType === 'conversational' && (
+                  <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                    <h4 className="text-sm font-semibold text-white mb-2">Memory Settings</h4>
+                    <label className="text-xs text-zinc-400 block mb-1">Max History Entries to Keep</label>
+                    <input
+                      type="number"
+                      value={config.dynamicConfig?.historyLength || 10}
+                      onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, historyLength: parseInt(e.target.value) } }))}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm"
+                    />
+                  </div>
+                )}
+                {config.ragType === 'agentic' && (
+                  <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                    <h4 className="text-sm font-semibold text-white mb-2">Agent Tools</h4>
+                    <p className="text-xs text-zinc-400 mb-3">Which capabilities should the agent have access to?</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['Web Search', 'Calculator', 'Weather API', 'Ticket System'].map(tool => (
+                        <button
+                          key={tool}
+                          onClick={() => toggleDynamicConfig('tools', tool)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${(config.dynamicConfig?.tools || []).includes(tool)
+                            ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                            : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                            }`}
+                        >
+                          {tool}
+                        </button>
+                      ))}
                     </div>
-                    {config.vectorDb === db.id && <Check className="w-4 h-4 text-cyan-400" />}
-                  </button>
-                ))}
+                  </div>
+                )}
+                {config.ragType === 'citation' && (
+                  <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                    <h4 className="text-sm font-semibold text-white mb-2">Citation Style</h4>
+                    <div className="flex gap-4">
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, citationStyle: 'inline' } }))}
+                        className={`px-4 py-2 text-sm rounded-lg border transition ${config.dynamicConfig?.citationStyle === 'inline' ? 'bg-zinc-800 border-cyan-500/50 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400'}`}
+                      >Inline [1]</button>
+                      <button
+                        onClick={() => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, citationStyle: 'end' } }))}
+                        className={`px-4 py-2 text-sm rounded-lg border transition ${config.dynamicConfig?.citationStyle === 'end' ? 'bg-zinc-800 border-cyan-500/50 text-white' : 'bg-zinc-950 border-zinc-800 text-zinc-400'}`}
+                      >End of Response summary</button>
+                    </div>
+                  </div>
+                )}
+                {/* Fallback for others currently just standard configs */}
+                {!['conversational', 'agentic', 'citation'].includes(config.ragType) && (
+                  <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 text-center py-8">
+                    <p className="text-sm text-zinc-500 font-medium">No specialized configuration needed for ({config.ragType}). Default settings will be applied.</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -330,9 +479,110 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
           {step === 5 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <Settings2 className="w-5 h-5 text-cyan-400" /> Optional Features
+                <Bot className="w-5 h-5 text-cyan-400" /> Models
               </h3>
-              <p className="text-sm text-zinc-400 mb-6">Enhance your pipelines with specialized components.</p>
+              <p className="text-sm text-zinc-400 mb-6">Select the generative LLM and the Embedding Model.</p>
+
+              <div>
+                <h4 className="text-sm mt-2 mb-3 font-semibold text-zinc-200">LLM Generator (Language Model)</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {LLM_MODELS.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => updateConfig('llmModel', m.id)}
+                      className={`p-3 rounded-lg border text-left transition ${config.llmModel === m.id ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50' : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white hover:border-zinc-700'
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className={`text-sm font-medium ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        {config.llmModel === m.id && <Check className="w-4 h-4 text-cyan-400" />}
+                      </div>
+                      <p className="text-xs">{m.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm mt-6 mb-3 font-semibold text-zinc-200">Embedding Model</h4>
+                <div className="grid grid-cols-1 gap-2">
+                  {EMBEDDING_MODELS.map(m => (
+                    <button
+                      key={m.id}
+                      onClick={() => updateConfig('embeddingModel', m.id)}
+                      className={`p-3 rounded-lg border text-left transition ${config.embeddingModel === m.id ? 'bg-purple-500/10 border-purple-500/50 ring-1 ring-purple-500/50' : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white hover:border-zinc-700'
+                        }`}
+                    >
+                      <div className="flex justify-between items-center mb-1">
+                        <span className={`text-sm font-medium ${config.embeddingModel === m.id ? 'text-purple-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        {config.embeddingModel === m.id && <Check className="w-4 h-4 text-purple-400" />}
+                      </div>
+                      <p className="text-xs">{m.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 6 && (
+            <div className="space-y-6 animate-fade-in relative z-10">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
+                <Settings2 className="w-5 h-5 text-cyan-400" /> Advanced Tuning
+              </h3>
+              <p className="text-sm text-zinc-400 mb-6">Fine-tune the ingestion and retrieval parameters.</p>
+
+              <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-5">
+                <div>
+                  <label className="flex justify-between text-sm font-medium text-white mb-2">
+                    Chunk Size <span className="text-cyan-400">{config.chunkSize} tokens</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="100" max="2000" step="100"
+                    value={config.chunkSize}
+                    onChange={(e) => updateConfig('chunkSize', parseInt(e.target.value))}
+                    className="w-full accent-cyan-500 bg-zinc-800 h-2 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <p className="text-xs text-zinc-500 mt-2">Determines how large each document segment is before embedding.</p>
+                </div>
+
+                <div className="border-t border-zinc-800 pt-5">
+                  <label className="flex justify-between text-sm font-medium text-white mb-2">
+                    Retrieval Top-K <span className="text-cyan-400">{config.topK} docs</span>
+                  </label>
+                  <input
+                    type="range"
+                    min="1" max="20" step="1"
+                    value={config.topK}
+                    onChange={(e) => updateConfig('topK', parseInt(e.target.value))}
+                    className="w-full accent-cyan-500 bg-zinc-800 h-2 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <p className="text-xs text-zinc-500 mt-2">Number of initial documents retrieved from the vector DB.</p>
+                </div>
+
+                <div className="border-t border-zinc-800 pt-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-white">Enable Neural Reranking</div>
+                    <div className="text-xs text-zinc-500 mt-1">Improves relevance by cross-encoding queries with retrieved docs.</div>
+                  </div>
+                  <button
+                    onClick={() => updateConfig('useReranker', !config.useReranker)}
+                    className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${config.useReranker ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.useReranker ? 'translate-x-6' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="space-y-6 animate-fade-in relative z-10">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
+                <Palette className="w-5 h-5 text-cyan-400" /> Features & Theming
+              </h3>
+              <p className="text-sm text-zinc-400 mb-6">Add extra capabilities and customize the look.</p>
 
               <div className="grid grid-cols-2 gap-4">
                 {FEATURES.map(feat => {
@@ -371,11 +621,19 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
             </div>
           )}
 
-          {step === 6 && (
-            <RagVisualizer config={config} />
+          {step === 8 && (
+            <div className="animate-fade-in relative z-10 h-full flex flex-col -mt-4">
+              <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
+                <Layers className="w-5 h-5 text-cyan-400" /> Architecture Graph
+              </h3>
+              <p className="text-sm text-zinc-400 mb-4 shrink-0">Visual summary of your configured multi-agent system.</p>
+              <div className="flex-1 min-h-[300px] border border-zinc-800 rounded-2xl overflow-hidden shadow-inner bg-zinc-950/50 relative">
+                <RagVisualizer config={config} />
+              </div>
+            </div>
           )}
 
-          {step === 7 && (
+          {step === 9 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Globe className="w-5 h-5 text-cyan-400" /> Deployment Options
@@ -410,13 +668,13 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
             </div>
           )}
 
-          {step === 8 && (
+          {step === 10 && (
             <div className="space-y-8 animate-fade-in flex flex-col items-center justify-center h-full">
               {isDeploying ? (
                 <>
-                  <div className="relative flex items-center justify-center">
-                    <div className="absolute inset-0 border-4 border-t-cyan-500 border-r-cyan-500 border-b-transparent border-l-transparent rounded-full animate-spin w-16 h-16" />
-                    <Bot className="w-6 h-6 text-zinc-500 animate-pulse" />
+                  <div className="relative flex items-center justify-center w-full max-w-[300px] aspect-square mx-auto my-auto">
+                    <div className="absolute inset-0 border-4 border-t-cyan-500 border-r-cyan-500 border-b-transparent border-l-transparent rounded-full animate-spin w-20 h-20 m-auto" />
+                    <Bot className="w-8 h-8 text-zinc-500 animate-pulse m-auto" />
                   </div>
                   <div className="text-center">
                     <h3 className="text-lg font-semibold text-white">Compiling Components</h3>
@@ -427,43 +685,34 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
                   </div>
                 </>
               ) : (
-                <>
-                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center mb-2">
-                    <Check className="w-8 h-8 text-emerald-400" />
-                  </div>
-                  <div className="text-center">
-                    <h3 className="text-2xl font-bold text-white mb-2">Ready to Launch!</h3>
-                    <p className="text-sm text-zinc-400 mb-6">Your customized Agentic RAG is active.</p>
-                  </div>
-
-                  {deployData && (
-                    <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl w-full max-w-sm relative group">
-                      <Terminal className="w-4 h-4 text-zinc-500 absolute top-3 right-3" />
-                      <div className="text-xs text-zinc-500 mb-1">API Endpoint</div>
-                      <code className="text-sm text-cyan-300 font-mono break-all">{deployData.deployment_info?.query_endpoint || 'http://localhost:8000/api/rag/mock/query'}</code>
+                deployData && !isDeploying && (
+                  <div className="flex flex-col items-center justify-center text-center animate-slide-up space-y-6 w-full max-w-md">
+                    <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center border border-emerald-500/50 mb-2 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                      <Check className="w-10 h-10 text-emerald-400" />
                     </div>
-                  )}
-
-                  <button
-                    onClick={() => setStep(9)}
-                    className="mt-4 px-6 py-3 bg-white text-black font-semibold rounded-full hover:bg-zinc-200 transition flex items-center gap-2"
-                  >
-                    Enter Live Test Arena <Play className="w-4 h-4" />
-                  </button>
-                </>
+                    <div>
+                      <h3 className="text-2xl font-bold text-white mb-2">Deployed Successfully</h3>
+                      <p className="text-zinc-400">Your {RAG_TYPES.find(r => r.id === config.ragType)?.name} is live and ready for production.</p>
+                      <div className="bg-zinc-900/50 p-3 mt-4 rounded-xl border border-zinc-800 text-xs font-mono text-zinc-400 text-left">
+                        API Endpoint: <span className="text-emerald-400">{deployData.deployment_info?.query_endpoint}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 w-full pt-4">
+                      <button onClick={() => window.open(`/chat/${deployData.deployment_info?.pipeline_id}`, '_blank')} className="flex-1 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold text-white shadow-lg shadow-cyan-500/20 hover:scale-[1.02] transition">
+                        Open Standalone Chatbot
+                      </button>
+                    </div>
+                  </div>
+                )
               )}
             </div>
-          )}
-
-          {step === 9 && (
-            <RagChatTester themeColor={selectedThemeObj.color} themeName={selectedThemeObj.name} />
           )}
 
         </div>
 
         {/* Footer Navigation */}
-        {step < 8 && (
-          <div className="p-6 border-t border-white/5 bg-zinc-950 flex items-center justify-between z-20">
+        {(step < 10) && (
+          <div className="p-6 border-t border-white/5 bg-zinc-950 flex items-center justify-between z-20 shrink-0">
             <button
               onClick={() => step > 1 && setStep(step - 1)}
               className={`text-sm font-medium ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white transition'}`}
@@ -474,14 +723,14 @@ export default function CreateRagModal({ isOpen, onClose, onComplete }) {
               onClick={handleNext}
               className={`px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold rounded-full flex items-center gap-2 transition active:scale-95`}
             >
-              {step === 7 ? 'Initialize Deployment' : 'Next'}
+              {step === 9 ? 'Initialize Deployment' : 'Next'}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {step === 9 && (
-          <div className="p-4 border-t border-white/5 bg-zinc-950 flex items-center justify-end z-20">
+        {(step === 10 && !isDeploying) && (
+          <div className="p-4 border-t border-white/5 bg-zinc-950 flex items-center justify-end z-20 shrink-0">
             <button
               onClick={handleNext}
               className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-emerald-500 text-white font-semibold rounded-full hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition active:scale-95"

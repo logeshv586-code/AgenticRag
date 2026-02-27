@@ -72,8 +72,15 @@ class ChatRequest(BaseModel):
 class DeployRequest(BaseModel):
     extracted_texts: List[str]
     ragType: str
-    useCase: str
-    vectorDb: str
+    dbType: str
+    cloudDb: str
+    localDb: str
+    dynamicConfig: dict = {}
+    llmModel: str
+    embeddingModel: str
+    chunkSize: int
+    topK: int
+    useReranker: bool
     theme: str
     features: Optional[List[str]] = []
     deploymentType: Optional[str] = "api"
@@ -146,12 +153,7 @@ async def api_chat(req: ChatRequest):
 @app.post("/api/deploy")
 async def api_deploy(req: DeployRequest):
     try:
-        deployment_info = deploy_rag_system(
-            texts=req.extracted_texts,
-            rag_type=req.ragType,
-            use_case=req.useCase,
-            vector_db=req.vectorDb
-        )
+        deployment_info = deploy_rag_system(req.model_dump())
         return {
             "status": "success",
             "message": "Agentic RAG deployed successfully.",
@@ -205,13 +207,21 @@ async def api_demo_eratimbers():
         texts = scrape_urls([url])
         
         print("Deploying Hybrid RAG for Era Timbers...")
-        deployment_info = deploy_rag_system(
-            texts=texts,
-            rag_type="hybrid",
-            use_case="sales",
-            vector_db="inmemory",
-            features=["citations"]
-        )
+        deployment_info = deploy_rag_system({
+            "extracted_texts": texts,
+            "ragType": "hybrid",
+            "dbType": "local",
+            "localDb": "chroma",
+            "cloudDb": "",
+            "dynamicConfig": {},
+            "llmModel": "qwen-local",
+            "embeddingModel": "bge-local",
+            "chunkSize": 500,
+            "topK": 5,
+            "useReranker": False,
+            "theme": "emerald",
+            "features": ["citations"]
+        })
         
         return {
             "status": "success",
