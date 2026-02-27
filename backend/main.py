@@ -3,7 +3,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import os
-
 from services.scraper import scrape_urls
 from services.document_parser import parse_document
 from services.rag_builder import deploy_rag_system
@@ -11,8 +10,7 @@ import subprocess
 import atexit
 import time
 import requests
-
-app = FastAPI(title="Agentic RAG Creator API")
+from contextlib import asynccontextmanager
 
 # --- Local LLM Server Management ---
 MODEL_PATH = r"C:\Users\e629\Documents\AgenticRag\Qwen2.5-14B-Instruct-1M-Q3_K_L.gguf"
@@ -24,14 +22,17 @@ def start_llm_server():
     print(f"Starting local LLM server on port {LLM_PORT}...")
     try:
         # Start the llama_cpp.server as a subprocess
+        # Added shell=True and simplified command for Windows stability
+        cmd = f'python -m llama_cpp.server --model "{MODEL_PATH}" --port {LLM_PORT} --host 0.0.0.0 --n_ctx 4096'
         llm_process = subprocess.Popen(
-            ["python", "-m", "llama_cpp.server", "--model", MODEL_PATH, "--port", str(LLM_PORT), "--host", "0.0.0.0", "--n_ctx", "4096"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            cmd,
+            shell=True,
+            # Inherit stdout and stderr so we can see LLM logs in the uvicorn console
+            stdout=None,
+            stderr=None,
+            text=True
         )
-        # Give it a few seconds to initialize
-        time.sleep(5)
-        print("LLM server started.")
+        print("LLM subprocess spawned.")
     except Exception as e:
         print(f"Failed to start LLM server: {e}")
 
@@ -42,10 +43,16 @@ def stop_llm_server():
         llm_process.terminate()
         llm_process.wait()
 
-# Start the server when FastAPI starts
-start_llm_server()
-# Ensure it stops when FastAPI shuts down
-atexit.register(stop_llm_server)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    start_llm_server()
+    # Give it a bit of time but don't block the event loop
+    yield
+    # Shutdown logic
+    stop_llm_server()
+
+app = FastAPI(title="Agentic RAG Creator API", lifespan=lifespan)
 # -----------------------------------
 
 app.add_middleware(
