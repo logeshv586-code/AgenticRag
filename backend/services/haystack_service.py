@@ -9,6 +9,7 @@ from haystack.utils import Secret
 
 # Demo document store
 in_memory_store = InMemoryDocumentStore()
+active_pipelines = {}
 
 def build_and_deploy_pipeline(config: dict):
     """
@@ -107,4 +108,28 @@ def build_and_deploy_pipeline(config: dict):
     import uuid
     pipeline_id = f"pipe_{str(uuid.uuid4())[:8]}"
     
+    active_pipelines[pipeline_id] = pipeline
+    
     return pipeline_id, pipeline
+
+def query_pipeline(pipeline_id: str, query: str) -> str:
+    """
+    Runs a query through the deployed pipeline.
+    """
+    pipeline = active_pipelines.get(pipeline_id)
+    if not pipeline:
+        return "Error: Pipeline not found or has been stopped."
+    
+    try:
+        result = pipeline.run({
+            "retriever": {"query": query},
+            "prompt_builder": {"query": query}
+        })
+        
+        # The OpenAIGenerator returns replies in a list
+        replies = result.get("llm", {}).get("replies", [])
+        if replies:
+            return replies[0]
+        return "No response generated."
+    except Exception as e:
+        return f"Error executing pipeline: {str(e)}"

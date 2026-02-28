@@ -6,6 +6,7 @@ import os
 from services.scraper import scrape_urls
 from services.document_parser import parse_document
 from services.rag_builder import deploy_rag_system
+from services.haystack_service import query_pipeline
 import subprocess
 import atexit
 import time
@@ -68,6 +69,7 @@ class ScrapeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str
+    pipeline_id: Optional[str] = None
 
 class DeployRequest(BaseModel):
     extracted_texts: List[str]
@@ -154,12 +156,13 @@ async def api_chat(req: ChatRequest):
 async def api_deploy(req: DeployRequest):
     try:
         deployment_info = deploy_rag_system(req.model_dump())
+        pipeline_id = deployment_info.get("pipeline_id", "mock_pipeline_123")
         return {
             "status": "success",
             "message": "Agentic RAG deployed successfully.",
             "deployment_info": deployment_info,
             "theme": req.theme,
-            "pipeline_id": "mock_pipeline_123" # In reality, return the deployed pipeline string/ID
+            "pipeline_id": pipeline_id
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -185,9 +188,13 @@ async def api_visualize(pipeline_id: str):
 @app.post("/api/test-chat")
 async def api_test_chat(req: ChatRequest):
     # This acts as the actual chat endpoint for the deployed RAG pipeline
-    q = req.query.lower()
+    if not req.pipeline_id:
+        return {"answer": "Error: No pipeline_id provided."}
+    
+    print(f"Executing test chat for pipeline {req.pipeline_id} with query: {req.query}")
+    answer = query_pipeline(req.pipeline_id, req.query)
     return {
-        "answer": f"Simulated response from the deployed Haystack pipeline for query: '{req.query}'"
+        "answer": answer
     }
 
 @app.post("/api/feedback")
