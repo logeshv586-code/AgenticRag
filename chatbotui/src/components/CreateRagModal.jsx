@@ -9,9 +9,9 @@ const DB_TYPES = [
 ];
 
 const CLOUD_DBS = [
-  { id: 'pinecone', name: 'Pinecone' },
-  { id: 'weaviate', name: 'Weaviate' },
-  { id: 'milvus', name: 'Milvus' }
+  { id: 'pinecone', name: 'Pinecone', desc: 'Managed, scalable. Best for large-scale datasets.' },
+  { id: 'weaviate', name: 'Weaviate', desc: 'Flexible, open-source. Trusted for government and secure data.' },
+  { id: 'milvus', name: 'Milvus', desc: 'Cloud-native, distributed. Optimized for enterprise AI workloads.' }
 ];
 
 const LOCAL_DBS = [
@@ -20,16 +20,16 @@ const LOCAL_DBS = [
 ];
 
 const RAG_TYPES = [
-  { id: 'basic', name: 'Basic RAG', desc: 'Standard vector similarity search.' },
-  { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history.' },
-  { id: 'multimodal', name: 'Multimodal RAG', desc: 'Handles text, images, and audio.' },
-  { id: 'structured', name: 'Structured/Graph RAG', desc: 'Retrieves from structured data or Knowledge Graphs.' },
-  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic.' },
-  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds.' },
+  { id: 'basic', name: 'Standard RAG', desc: 'Standard vector similarity search. Best for simple text Q&A.' },
+  { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history for assistants.' },
+  { id: 'multimodal', name: 'Multi-RAG (Multimodal)', desc: 'Handles text, images, and audio seamlessly.' },
+  { id: 'structured', name: 'Graph RAG', desc: 'Deep relationship mapping and reasoning from knowledge graphs.' },
+  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic to take actions.' },
+  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds instantly.' },
   { id: 'personalized', name: 'Personalized RAG', desc: 'Adapts to user-specific memory and preferences.' },
-  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across languages.' },
+  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across multiple languages.' },
   { id: 'voice', name: 'Voice-Ready RAG', desc: 'Speech-to-text input and spoken output.' },
-  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources for answers.' },
+  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources and evidence for answers.' },
 ];
 
 const LLM_MODELS = [
@@ -222,11 +222,11 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in backdrop-blur-sm bg-black/50">
       <div className="absolute inset-0 bg-zinc-950/80" onClick={onClose} />
 
-      <div className="relative w-full max-w-3xl bg-[#0b0b0e] border border-cyan-500/20 rounded-3xl shadow-2xl overflow-hidden ring-1 ring-white/10 flex flex-col h-[650px] animate-slide-up">
+      <div className="relative w-full max-w-4xl bg-[#0b0b0e]/90 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[750px] animate-slide-up glass-card">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5 relative overflow-hidden">
-          <div className="absolute inset-x-0 bottom-0 h-0.5 bg-zinc-800">
-            <div className="h-full transition-all duration-300 ease-out" style={{ width: `${(step / totalSteps) * 100}%`, backgroundColor: selectedThemeObj.color }} />
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/5">
+            <div className="h-full transition-all duration-700 cubic-bezier(0.16, 1, 0.3, 1)" style={{ width: `${(step / totalSteps) * 100}%`, background: `linear-gradient(90deg, ${selectedThemeObj.color}, #3b82f6)` }} />
           </div>
 
           <div className="flex items-center gap-3">
@@ -259,10 +259,10 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
           {step === 1 && (
             <div className="space-y-8 animate-fade-in">
               <div>
-                <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                  <LinkIcon className="w-5 h-5 text-cyan-400" /> Connect Data Sources
+                <h3 className="text-xl font-bold text-white flex items-center gap-3 mb-2 text-premium">
+                  <Globe className="w-6 h-6 text-cyan-400" /> Connect Data Sources
                 </h3>
-                <p className="text-sm text-zinc-400 mb-6">URLs to scrape for knowledge indexing.</p>
+                <p className="text-sm text-zinc-400 mb-6">Enter URLs you want your AI to learn from. We'll scrape everything.</p>
                 <div className="space-y-3">
                   {config.urls.map((url, i) => (
                     <div key={i} className="flex gap-2">
@@ -284,16 +284,16 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
               </div>
 
               <div>
-                <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                  <Upload className="w-5 h-5 text-cyan-400" /> File Upload
+                <h3 className="text-xl font-bold text-white flex items-center gap-3 mb-2 text-premium">
+                  <Upload className="w-6 h-6 text-cyan-400" /> Smart Upload & OCR
                 </h3>
-                <label className="border-2 border-dashed border-zinc-800 hover:border-cyan-500/30 bg-zinc-900/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition cursor-pointer group">
+                <label className="border-2 border-dashed border-zinc-800 hover:border-cyan-500/30 bg-zinc-900/40 rounded-3xl p-10 flex flex-col items-center justify-center text-center transition cursor-pointer group glass-morphism">
                   <input type="file" multiple className="hidden" onChange={handleFileChange} />
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 group-hover:bg-cyan-500/20 flex items-center justify-center mb-3 transition">
-                    <Upload className="w-6 h-6 text-zinc-400 group-hover:text-cyan-400 transition" />
+                  <div className="w-16 h-16 rounded-2xl bg-white/5 group-hover:bg-cyan-500/20 flex items-center justify-center mb-4 transition border border-white/5 group-hover:border-cyan-500/30">
+                    <Upload className="w-8 h-8 text-zinc-400 group-hover:text-cyan-400 transition" />
                   </div>
-                  <span className="text-sm font-medium text-white mb-1">Click to upload or drag and drop</span>
-                  <span className="text-xs text-zinc-500">PDF, TXT, DOCX</span>
+                  <span className="text-base font-bold text-white mb-2">Drop Files or Images</span>
+                  <p className="text-xs text-zinc-500 max-w-xs">Supports PDFs, DOCX, and high-res Images (OCR). We automatically extract all text.</p>
                 </label>
                 {config.files.length > 0 && (
                   <div className="mt-4 space-y-2">
@@ -319,23 +319,23 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
               <p className="text-sm text-zinc-400 mb-6">Select where your embeddings will be stored and queried.</p>
 
               {/* Deployment Location (Cloud vs Local vs Hybrid) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 {DB_TYPES.map(type => (
                   <button
                     key={type.id}
                     onClick={() => updateConfig('dbType', type.id)}
-                    className={`p-4 rounded-xl border text-left transition group ${config.dbType === type.id
-                      ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                    className={`p-5 rounded-2xl border text-left transition-all duration-300 group glass-morphism ${config.dbType === type.id
+                      ? 'border-cyan-500/50 bg-cyan-500/10 active'
+                      : 'border-white/5 hover:border-white/20 hover:bg-white/5'
                       }`}
                   >
-                    <div className="flex justify-between items-start mb-1">
-                      <span className={`font-semibold text-sm ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
+                    <div className="flex justify-between items-start mb-2">
+                      <span className={`font-bold text-sm text-premium ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
                         {type.name}
                       </span>
-                      {config.dbType === type.id && <Check className="w-4 h-4 text-cyan-400" />}
+                      {config.dbType === type.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                     </div>
-                    <p className="text-xs text-zinc-500">{type.desc}</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">{type.desc}</p>
                   </button>
                 ))}
               </div>
@@ -345,15 +345,19 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                 {(config.dbType === 'cloud' || config.dbType === 'hybrid') && (
                   <div>
                     <h4 className="text-sm font-medium text-zinc-300 mb-3">Cloud Provider</h4>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 gap-3">
                       {CLOUD_DBS.map(db => (
                         <button
                           key={db.id}
                           onClick={() => updateConfig('cloudDb', db.id)}
-                          className={`p-3 rounded-lg border text-center transition ${config.cloudDb === db.id ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-white'
+                          className={`p-4 rounded-xl border text-left transition-all duration-300 glass-morphism ${config.cloudDb === db.id ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-white/5 hover:border-white/10 hover:bg-white/5'
                             }`}
                         >
-                          <span className="text-sm">{db.name}</span>
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="text-sm font-bold text-white">{db.name}</span>
+                            {config.cloudDb === db.id && <Check className="w-4 h-4 text-cyan-400" />}
+                          </div>
+                          <p className="text-xs text-zinc-500">{db.desc}</p>
                         </button>
                       ))}
                     </div>
@@ -388,23 +392,23 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
               </h3>
               <p className="text-sm text-zinc-400 mb-6">Choose the foundational Haystack topology for your Assistant.</p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 h-[450px] overflow-y-auto pr-3 scrollbar-premium">
                 {RAG_TYPES.map(type => (
                   <button
                     key={type.id}
                     onClick={() => updateConfig('ragType', type.id)}
-                    className={`p-4 rounded-xl border text-left transition group ${config.ragType === type.id
-                      ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
-                      : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                    className={`p-5 rounded-2xl border text-left transition-all duration-300 group glass-morphism ${config.ragType === type.id
+                      ? 'border-cyan-500/50 bg-cyan-500/10 active'
+                      : 'border-white/5 hover:border-white/20 hover:bg-white/5'
                       }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className={`font-semibold text-sm ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
+                      <span className={`font-bold text-sm text-premium ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
                         {type.name}
                       </span>
-                      {config.ragType === type.id && <Check className="w-4 h-4 text-cyan-400" />}
+                      {config.ragType === type.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                     </div>
-                    <p className="text-xs text-zinc-500">{type.desc}</p>
+                    <p className="text-xs text-zinc-500 leading-relaxed">{type.desc}</p>
                   </button>
                 ))}
               </div>
@@ -432,20 +436,28 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                   </div>
                 )}
                 {config.ragType === 'agentic' && (
-                  <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
-                    <h4 className="text-sm font-semibold text-white mb-2">Agent Tools</h4>
-                    <p className="text-xs text-zinc-400 mb-3">Which capabilities should the agent have access to?</p>
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism">
+                    <h4 className="text-sm font-bold text-white mb-2 text-premium">Agent Toolset</h4>
+                    <p className="text-xs text-zinc-500 mb-4">Select capabilities for your agent to interact with external systems.</p>
                     <div className="flex flex-wrap gap-2">
-                      {['Web Search', 'Calculator', 'Weather API', 'Ticket System'].map(tool => (
+                      {[
+                        { name: 'Web Search', icon: Globe },
+                        { name: 'Calculator', icon: Terminal },
+                        { name: 'Ticket System', icon: Layers },
+                        { name: 'Calendar', icon: LayoutTemplate },
+                        { name: 'Weather API', icon: Globe },
+                        { name: 'MCP Discovery', icon: Code }
+                      ].map(tool => (
                         <button
-                          key={tool}
-                          onClick={() => toggleDynamicConfig('tools', tool)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition ${(config.dynamicConfig?.tools || []).includes(tool)
-                            ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                            : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                          key={tool.name}
+                          onClick={() => toggleDynamicConfig('tools', tool.name)}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all duration-300 flex items-center gap-2 ${(config.dynamicConfig?.tools || []).includes(tool.name)
+                            ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300 active'
+                            : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white hover:border-white/10'
                             }`}
                         >
-                          {tool}
+                          <tool.icon className="w-3.5 h-3.5" />
+                          {tool.name}
                         </button>
                       ))}
                     </div>
@@ -490,14 +502,14 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     <button
                       key={m.id}
                       onClick={() => updateConfig('llmModel', m.id)}
-                      className={`p-3 rounded-lg border text-left transition ${config.llmModel === m.id ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50' : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:text-white hover:border-zinc-700'
+                      className={`p-4 rounded-xl border text-left transition-all duration-300 glass-morphism ${config.llmModel === m.id ? 'border-cyan-500/50 bg-cyan-500/10 active' : 'border-white/5 text-zinc-400 hover:bg-white/5 hover:text-white hover:border-white/10'
                         }`}
                     >
                       <div className="flex justify-between items-center mb-1">
-                        <span className={`text-sm font-medium ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
-                        {config.llmModel === m.id && <Check className="w-4 h-4 text-cyan-400" />}
+                        <span className={`text-sm font-bold ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        {config.llmModel === m.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                       </div>
-                      <p className="text-xs">{m.desc}</p>
+                      <p className="text-xs leading-relaxed">{m.desc}</p>
                     </button>
                   ))}
                 </div>
@@ -532,9 +544,9 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
               </h3>
               <p className="text-sm text-zinc-400 mb-6">Fine-tune the ingestion and retrieval parameters.</p>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl space-y-5">
+              <div className="bg-white/5 border border-white/5 p-8 rounded-[32px] space-y-8 glass-morphism">
                 <div>
-                  <label className="flex justify-between text-sm font-medium text-white mb-2">
+                  <label className="flex justify-between text-sm font-bold text-white mb-3 text-premium">
                     Chunk Size <span className="text-cyan-400">{config.chunkSize} tokens</span>
                   </label>
                   <input
@@ -542,9 +554,9 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     min="100" max="2000" step="100"
                     value={config.chunkSize}
                     onChange={(e) => updateConfig('chunkSize', parseInt(e.target.value))}
-                    className="w-full accent-cyan-500 bg-zinc-800 h-2 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-500"
                   />
-                  <p className="text-xs text-zinc-500 mt-2">Determines how large each document segment is before embedding.</p>
+                  <p className="text-[10px] text-zinc-500 mt-3 font-medium uppercase tracking-wider">Granularity of knowledge base segments</p>
                 </div>
 
                 <div className="border-t border-zinc-800 pt-5">
@@ -591,14 +603,14 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     <button
                       key={feat.id}
                       onClick={() => toggleFeature(feat.id)}
-                      className={`p-4 rounded-xl border flex items-center justify-between transition ${isActive
-                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                        : 'bg-zinc-900/50 border-zinc-800 text-zinc-400 hover:bg-zinc-900 hover:border-zinc-700'
+                      className={`p-5 rounded-2xl border flex items-center justify-between transition-all duration-300 glass-morphism ${isActive
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400 active'
+                        : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:border-white/10'
                         }`}
                     >
-                      <span className="text-sm font-medium">{feat.name}</span>
-                      <div className={`w-4 h-4 rounded-sm border flex items-center justify-center transition ${isActive ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600'}`}>
-                        {isActive && <Check className="w-3 h-3 text-white" />}
+                      <span className="text-sm font-bold text-premium">{feat.name}</span>
+                      <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition ${isActive ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>
+                        {isActive && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
                       </div>
                     </button>
                   );
@@ -627,7 +639,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                 <Layers className="w-5 h-5 text-cyan-400" /> Architecture Graph
               </h3>
               <p className="text-sm text-zinc-400 mb-4 shrink-0">Visual summary of your configured multi-agent system.</p>
-              <div className="flex-1 min-h-[300px] border border-zinc-800 rounded-2xl overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 shadow-inner bg-zinc-950/50 relative">
+              <div className="flex-1 min-h-[350px] border border-white/5 rounded-[32px] overflow-hidden shadow-inner bg-black/40 relative glass-morphism">
                 <RagVisualizer config={config} />
               </div>
             </div>
@@ -643,26 +655,30 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   onClick={() => updateConfig('deploymentType', 'api')}
-                  className={`p-6 rounded-2xl border text-left flex flex-col items-start transition ${config.deploymentType === 'api'
-                    ? 'bg-cyan-500/10 border-cyan-500/50 ring-1 ring-cyan-500/50'
-                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                  className={`p-8 rounded-[32px] border text-left flex flex-col items-start transition-all duration-500 glass-card ${config.deploymentType === 'api'
+                    ? 'border-cyan-500/50 bg-cyan-500/10 active'
+                    : 'border-white/5 hover:border-white/20 hover:bg-white/5'
                     }`}
                 >
-                  <Globe className={`w-8 h-8 mb-4 ${config.deploymentType === 'api' ? 'text-cyan-400' : 'text-zinc-500'}`} />
-                  <h4 className="font-semibold text-white mb-1">Online API Access</h4>
-                  <p className="text-xs text-zinc-500">Deploy to cloud/local server and expose standard REST API endpoints.</p>
+                  <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/5">
+                    <Globe className={`w-7 h-7 ${config.deploymentType === 'api' ? 'text-cyan-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <h4 className="font-bold text-lg text-white mb-2 text-premium">Universal Cloud API</h4>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Expose your RAG intelligence via high-performance REST endpoints. Best for web & mobile apps.</p>
                 </button>
 
                 <button
                   onClick={() => updateConfig('deploymentType', 'offline')}
-                  className={`p-6 rounded-2xl border text-left flex flex-col items-start transition ${config.deploymentType === 'offline'
-                    ? 'bg-purple-500/10 border-purple-500/50 ring-1 ring-purple-500/50'
-                    : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-900'
+                  className={`p-8 rounded-[32px] border text-left flex flex-col items-start transition-all duration-500 glass-card ${config.deploymentType === 'offline'
+                    ? 'border-purple-500/50 bg-purple-500/10 active'
+                    : 'border-white/5 hover:border-white/20 hover:bg-white/5'
                     }`}
                 >
-                  <Code className={`w-8 h-8 mb-4 ${config.deploymentType === 'offline' ? 'text-purple-400' : 'text-zinc-500'}`} />
-                  <h4 className="font-semibold text-white mb-1">Offline Embedded Model</h4>
-                  <p className="text-xs text-zinc-500">Export the Haystack pipeline for embedding directly into edge devices or local apps.</p>
+                  <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/5">
+                    <Code className={`w-7 h-7 ${config.deploymentType === 'offline' ? 'text-purple-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <h4 className="font-bold text-lg text-white mb-2 text-premium">Offline Edge Binary</h4>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Serialize the Haystack pipeline for air-gapped deployment on local servers or edge devices.</p>
                 </button>
               </div>
             </div>
@@ -697,9 +713,9 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         API Endpoint: <span className="text-emerald-400">{deployData.deployment_info?.query_endpoint}</span>
                       </div>
                     </div>
-                    <div className="flex gap-4 w-full pt-4">
-                      <button onClick={() => window.open(`/chat/${deployData.deployment_info?.pipeline_id}`, '_blank')} className="flex-1 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-xl font-bold text-white shadow-lg shadow-cyan-500/20 hover:scale-[1.02] transition">
-                        Open Standalone Chatbot
+                    <div className="flex gap-4 w-full pt-8">
+                      <button onClick={() => window.open(`/chat/${deployData.deployment_info?.pipeline_id}`, '_blank')} className="flex-1 px-8 py-5 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 rounded-[20px] font-bold text-white shadow-xl shadow-cyan-500/20 hover:scale-[1.02] transition-all duration-300 hover:glow-cyan active:scale-95">
+                        Launch Standalone Experience
                       </button>
                     </div>
                   </div>

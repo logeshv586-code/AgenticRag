@@ -39,12 +39,12 @@ function App() {
   const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
 
   const ragTypes = [
-    { key: 'basic_rag', title: 'Basic RAG', icon: Search, short: 'Embed, retrieve Top‑K, answer with citations.', works: ['Split text to chunks', 'Embed into vectors', 'Search Top‑K', 'Generate with context'], canDo: ['FAQs', 'General Q&A'], query: 'Explain basic RAG workflow' },
-    { key: 'hybrid_rag', title: 'Hybrid RAG', icon: Wand2, short: 'Combine keyword and vector search for recall and precision.', works: ['BM25 + vector search', 'Weighted scoring', 'Deduplicate and rank'], canDo: ['Docs with exact terms', 'Codebases'], query: 'How does hybrid RAG improve retrieval?' },
-    { key: 'conversational_rag', title: 'Conversational RAG', icon: MessageCircle, short: 'Keep dialogue state and memory across turns.', works: ['Track session state', 'Retrieve per turn', 'Memory summarization'], canDo: ['Assistants', 'Support chat'], query: 'What is conversational RAG?' },
-    { key: 'multimodal_rag', title: 'Multimodal RAG', icon: Layers, short: 'Retrieve text, images, audio, or video together.', works: ['Embed multiple modalities', 'Cross-modal retrieval'], canDo: ['Product search', 'Media Q&A'], query: 'When use multimodal RAG?' },
-    { key: 'structured_rag', title: 'Structured RAG', icon: Database, short: 'Query tables, SQL, and structured stores.', works: ['Schema-aware retrieval', 'SQL + text context'], canDo: ['Reports', 'Dashboards'], query: 'How does structured RAG work?' },
-    { key: 'kg_rag', title: 'Knowledge Graph RAG', icon: Workflow, short: 'Use relationships in graphs for precise answers.', works: ['Graph traversal', 'Path‑aware context'], canDo: ['Compliance', 'Entity relations'], query: 'Why graph‑based RAG?' },
+    { key: 'basic_rag', title: 'Standard RAG', icon: Search, short: 'Neural vector search for precise text retrieval and answering.', works: ['Chunk text precisely', 'Neural embeddings', 'Top-K retrieval', 'Contextual generation'], canDo: ['FAQs', 'Knowledge Bases'], query: 'How does Standard RAG work?' },
+    { key: 'hybrid_rag', title: 'Hybrid RAG', icon: Wand2, short: 'Combines keyword & vector search for maximum recall.', works: ['BM25 + Dense vector', 'Reciprocal Rank Fusion', 'Semantic re-ranking'], canDo: ['Documentation', 'Code Search'], query: 'Why use Hybrid RAG?' },
+    { key: 'conversational_rag', title: 'Conversational RAG', icon: MessageCircle, short: 'Maintains long-term context and chat history.', works: ['Session persistence', 'Context compression', 'Memory management'], canDo: ['Customer Support', 'AI Tutors'], query: 'Explain Conversational RAG memory.' },
+    { key: 'multimodal_rag', title: 'Multi-RAG', icon: Layers, short: 'Seamlessly retrieve images, audio, and video.', works: ['Cross-modal embedding', 'Multi-vector indexing'], canDo: ['Media Search', 'Product Catalogs'], query: 'Show Multi-RAG capabilities.' },
+    { key: 'structured_rag', title: 'Graph RAG', icon: Workflow, short: 'Deep reasoning across knowledge graphs and relationships.', works: ['Entity extraction', 'Relationship mapping', 'Graph traversal'], canDo: ['Legal Discovery', 'Medical Research'], query: 'Why use Graph RAG for reasoning?' },
+    { key: 'agentic_rag', title: 'Agentic RAG', icon: Brain, short: 'Reasoning agents that plan and use tools.', works: ['Multi-step planning', 'Tool execution', 'Self-correction'], canDo: ['Data Analysis', 'Web Research'], query: 'Show Agentic RAG in action.' },
     { key: 'agentic_rag', title: 'Agentic RAG', icon: Brain, short: 'Plan actions and call tools with retrieval.', works: ['Planner + tools', 'Iterative retrieval'], canDo: ['Research', 'Automation'], query: 'What is agentic RAG?' },
     { key: 'realtime_rag', title: 'Real‑time RAG', icon: Cpu, short: 'Ingest new data and answer on fresh content.', works: ['Streaming ingestion', 'Ephemeral cache'], canDo: ['News', 'Ops alerts'], query: 'How to keep RAG real‑time?' },
     { key: 'personalized_rag', title: 'Personalized RAG', icon: Users, short: 'Use user profile and preferences in retrieval.', works: ['User context features', 'Scoped indexing'], canDo: ['Portals', 'Learning'], query: 'How to personalize RAG?' },
@@ -337,17 +337,17 @@ function App() {
             {ragTypes.map((r) => {
               const Icon = r.icon;
               return (
-                <button key={r.key} onClick={() => openModal('rag', r)} className="text-left relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-5 hover:border-cyan-500/30 transition shadow-lg shadow-black/20">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center backdrop-blur">
-                      <Icon className="w-6 h-6 text-[#22d3ee]" />
+                <button key={r.key} onClick={() => openModal('rag', r)} className="text-left relative rounded-[28px] p-6 transition-all duration-300 glass-card group">
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-xl group-hover:scale-110 transition-transform">
+                      <Icon className="w-7 h-7 text-[#22d3ee]" />
                     </div>
-                    <div className="text-lg font-semibold">{r.title}</div>
+                    <div className="text-xl font-bold text-premium">{r.title}</div>
                   </div>
-                  <div className="text-sm text-zinc-300 min-h-[48px]">{r.short}</div>
-                  <div className="mt-4 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-zinc-400" />
-                    <span className="text-xs text-zinc-400">More info</span>
+                  <div className="text-sm text-zinc-400 leading-relaxed min-h-[48px]">{r.short}</div>
+                  <div className="mt-5 flex items-center gap-2 pt-4 border-t border-white/5">
+                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Ready to Deploy</span>
                   </div>
                 </button>
               );
