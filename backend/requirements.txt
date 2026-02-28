@@ -10,6 +10,8 @@ pinecone-client
 chromadb
 openai
 sentence-transformers
+pytesseract
+Pillow
 requests
 haystack-ai
 haystack-experimental
