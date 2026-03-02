@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: rag-api
+  name: rag-api-test_pipeline_002
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rag-api
+  template:
+    metadata:
+      labels:
+        app: rag-api
+    spec:
+      containers:
+      - env:
+        - name: PIPELINE_ID
+          value: test_pipeline_002
+        - name: RAG_TYPE
+          value: basic
+        image: my-registry/rag-api:test_pipeline_002
+        name: api
+        ports:
+        - containerPort: 8000
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 250m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rag-api-svc-test_pipeline_002
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: rag-api
+  type: LoadBalancer

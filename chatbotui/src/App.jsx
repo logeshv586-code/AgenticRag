@@ -37,6 +37,9 @@ function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [initialCreateConfig, setInitialCreateConfig] = useState(null);
   const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [metrics, setMetrics] = useState(null);
+  const [logs, setLogs] = useState([]);
 
   const ragTypes = [
     { key: 'basic_rag', title: 'Standard RAG', icon: Search, short: 'Neural vector search for precise text retrieval and answering.', works: ['Chunk text precisely', 'Neural embeddings', 'Top-K retrieval', 'Contextual generation'], canDo: ['FAQs', 'Knowledge Bases'], query: 'How does Standard RAG work?' },
@@ -254,6 +257,20 @@ function App() {
     handleSend(q);
   };
 
+  const loadDashboardData = async () => {
+    try {
+      const [mRes, lRes] = await Promise.all([
+        fetch('http://localhost:8000/api/metrics'),
+        fetch('http://localhost:8000/api/logs?limit=50')
+      ]);
+      if (mRes.ok) setMetrics(await mRes.json());
+      if (lRes.ok) setLogs(await lRes.json());
+      setIsDashboardOpen(true);
+    } catch (e) {
+      console.error("Failed to load dashboard data", e);
+    }
+  };
+
   return (
     <div className="relative min-h-screen bg-zinc-950 font-sans text-zinc-100 selection:bg-cyan-500/30">
       <div className="absolute inset-0 z-0 pointer-events-none">
@@ -292,6 +309,13 @@ function App() {
             >
               <Wand2 className="w-5 h-5" />
               Build Custom RAG
+            </button>
+            <button
+              onClick={loadDashboardData}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-zinc-900 border border-zinc-700 text-white font-bold hover:bg-zinc-800 ml-4 transition active:scale-95"
+            >
+              <Database className="w-5 h-5 text-cyan-400" />
+              Observability Dashboard
             </button>
           </div>
         </div>
@@ -607,6 +631,60 @@ function App() {
       >
         <X className="w-7 h-7" />
       </button>
+
+      {/* Observability Dashboard Modal */}
+      {isDashboardOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in backdrop-blur-sm bg-black/50">
+          <div className="absolute inset-0 bg-zinc-950/80" onClick={() => setIsDashboardOpen(false)} />
+          <div className="relative w-full max-w-5xl bg-[#0b0b0e]/90 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[800px] animate-slide-up glass-card">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Database className="text-cyan-400" /> Platform Observability Dashboard</h2>
+              <button onClick={() => setIsDashboardOpen(false)} className="p-2 hover:bg-white/5 rounded-full"><X className="w-5 h-5 text-zinc-400" /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {metrics && (
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-cyan-400">{metrics.total_queries}</div><div className="text-xs text-zinc-400">Total Queries</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-emerald-400">{metrics.total_tokens.toLocaleString()}</div><div className="text-xs text-zinc-400">Tokens Consumed</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-amber-400">{metrics.average_latency.toFixed(2)}s</div><div className="text-xs text-zinc-400">Avg Latency</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-rose-400">{metrics.total_errors}</div><div className="text-xs text-zinc-400">Total Errors</div></div>
+                </div>
+              )}
+              {logs && (
+                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 overflow-hidden">
+                  <h3 className="text-lg font-semibold text-white mb-4">Recent Query Logs</h3>
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full text-left text-sm text-zinc-300">
+                      <thead>
+                        <tr className="border-b border-white/10 text-zinc-500">
+                          <th className="py-2 px-2">Time</th>
+                          <th className="py-2 px-2">Pipeline</th>
+                          <th className="py-2 px-2">Model</th>
+                          <th className="py-2 px-2">Latency</th>
+                          <th className="py-2 px-2">Tokens</th>
+                          <th className="py-2 px-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logs.map((log, i) => (
+                          <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                            <td className="py-2 px-2 text-xs">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                            <td className="py-2 px-2">{log.pipeline_id}</td>
+                            <td className="py-2 px-2">{log.model_name || 'unknown'}</td>
+                            <td className="py-2 px-2">{log.latency.toFixed(2)}s</td>
+                            <td className="py-2 px-2">{log.tokens}</td>
+                            <td className="py-2 px-2">{log.error ? <span className="text-rose-400">Error</span> : <span className="text-emerald-400">OK</span>}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <CreateRagModal
         isOpen={isCreateModalOpen}

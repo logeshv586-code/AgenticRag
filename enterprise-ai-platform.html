@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deploy AI Experiences — Enterprise Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-void: #020508;
+    --bg-deep: #060d14;
+    --bg-card: #0a1520;
+    --bg-card-hover: #0f1e2e;
+    --border: rgba(255,255,255,0.06);
+    --border-glow: rgba(0,210,255,0.25);
+    --accent-cyan: #00d2ff;
+    --accent-blue: #0066ff;
+    --accent-purple: #7c3aed;
+    --accent-green: #00ffa3;
+    --accent-orange: #ff6b35;
+    --text-primary: #f0f4f8;
+    --text-secondary: #7a94aa;
+    --text-muted: #3d5468;
+    --glow-sm: 0 0 20px rgba(0,210,255,0.15);
+    --glow-md: 0 0 40px rgba(0,210,255,0.2);
+    --radius-card: 16px;
+    --radius-pill: 100px;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-primary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
+
+  /* ── CANVAS BACKGROUND ── */
+  #bg-canvas {
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+  }
+
+  .page-wrap { position: relative; z-index: 1; }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 48px;
+    height: 64px;
+    background: rgba(2,5,8,0.85);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    letter-spacing: -0.3px;
+  }
+
+  .nav-logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .nav-links {
+    display: flex; gap: 32px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 400;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--text-primary); }
+
+  .nav-cta {
+    display: flex; gap: 12px; align-items: center;
+  }
+
+  .btn-ghost {
+    padding: 8px 20px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--border-glow);
+    color: var(--text-primary);
+    background: rgba(0,210,255,0.05);
+  }
+
+  .btn-primary {
+    padding: 8px 22px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+    color: #000;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.25s;
+    box-shadow: 0 0 20px rgba(0,210,255,0.25);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 30px rgba(0,210,255,0.4);
+  }
+
+  /* ── HERO ── */
+  .hero {
+    min-height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 80px 48px 60px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 16px 6px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(0,210,255,0.2);
+    background: rgba(0,210,255,0.05);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--accent-cyan);
+    margin-bottom: 32px;
+    animation: fadeSlideUp 0.8s ease both;
+  }
+
+  .hero-badge-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 8px var(--accent-cyan);
+    animation: pulse-dot 2s ease infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(42px, 6vw, 80px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -2px;
+    max-width: 900px;
+    margin-bottom: 24px;
+    animation: fadeSlideUp 0.9s 0.1s ease both;
+  }
+
+  .hero h1 .highlight {
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue), var(--accent-purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: 17px;
+    color: var(--text-secondary);
+    max-width: 540px;
+    line-height: 1.7;
+    margin-bottom: 40px;
+    font-weight: 300;
+    animation: fadeSlideUp 0.9s 0.2s ease both;
+  }
+
+  .hero-actions {
+    display: flex; gap: 14px; align-items: center;
+    animation: fadeSlideUp 0.9s 0.3s ease both;
+    margin-bottom: 80px;
+  }
+
+  .btn-hero-primary {
+    padding: 14px 32px;
+    border-radius: var(--radius-pill);
+    border: none;
+    background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+    transition: all 0.25s;
+    box-shadow: 0 0 30px rgba(0,210,255,0.3);
+  }
+
+  .btn-hero-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 40px rgba(0,210,255,0.5);
+  }
+
+  .btn-hero-ghost {
+    padding: 14px 28px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .btn-hero-ghost:hover {
+    border-color: rgba(255,255,255,0.15);
+    color: var(--text-primary);
+  }
+
+  /* ── TYPE SCROLLBAR ── */
+  .type-scroll-wrap {
+    width: 100%;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 0;
+    animation: fadeSlideUp 0.9s 0.4s ease both;
+  }
+
+  .type-scroll-track {
+    display: flex;
+    gap: 12px;
+    width: max-content;
+    animation: scroll-left 30s linear infinite;
+  }
+
+  .type-scroll-track:hover { animation-play-state: paused; }
+
+  @keyframes scroll-left {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .type-chip {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 18px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .type-chip:hover {
+    border-color: var(--border-glow);
+    color: var(--text-primary);
+    background: var(--bg-card-hover);
+  }
+
+  .type-chip .chip-icon {
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+  }
+
+  /* ── SECTIONS ── */
+  .section {
+    padding: 100px 48px;
+    max-width: 1280px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+    margin-bottom: 16px;
+  }
+
+  .section-label::before {
+    content: '';
+    display: block;
+    width: 20px; height: 1px;
+    background: var(--accent-cyan);
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 3.5vw, 48px);
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 12px;
+  }
+
+  .section-desc {
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 300;
+    max-width: 520px;
+    line-height: 1.7;
+    margin-bottom: 56px;
+  }
+
+  .section-header-row {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 56px;
+  }
+
+  /* ── RAG GRID ── */
+  .rag-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .rag-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 28px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .rag-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 0% 0%, var(--card-accent,rgba(0,210,255,0.08)) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .rag-card:hover {
+    border-color: var(--border-glow);
+    background: var(--bg-card-hover);
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(0,0,0,0.4), var(--glow-sm);
+  }
+
+  .rag-card:hover::before { opacity: 1; }
+
+  .rag-card-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .rag-card-head {
+    display: flex; align-items: center; gap: 14px;
+  }
+
+  .rag-card-meta { flex: 1; }
+
+  .rag-card-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    margin-bottom: 4px;
+  }
+
+  .rag-card-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--accent-green);
+  }
+
+  .rag-card-status-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    box-shadow: 0 0 6px var(--accent-green);
+  }
+
+  .rag-card-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+    font-weight: 300;
+  }
+
+  .rag-card-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+
+  .rag-card-tag {
+    font-size: 10px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .rag-card-arrow {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    transition: all 0.2s;
+  }
+
+  .rag-card:hover .rag-card-arrow {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+    background: rgba(0,210,255,0.08);
+  }
+
+  /* Icon colors */
+  .icon-cyan  { background: rgba(0,210,255,0.1); color: var(--accent-cyan); }
+  .icon-blue  { background: rgba(0,102,255,0.12); color: #5b9fff; }
+  .icon-purple{ background: rgba(124,58,237,0.12); color: #a78bfa; }
+  .icon-green { background: rgba(0,255,163,0.1); color: var(--accent-green); }
+  .icon-orange{ background: rgba(255,107,53,0.12); color: var(--accent-orange); }
+  .icon-rose  { background: rgba(244,63,94,0.1); color: #fb7185; }
+
+  /* ── DIVIDER ── */
+  .section-divider {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 48px;
+  }
+
+  .divider-line {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+  }
+
+  /* ── ASSISTANT GRID ── */
+  .assistant-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .assistant-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 24px 28px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .assistant-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-blue));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.3s ease;
+  }
+
+  .assistant-card:hover::after { transform: scaleX(1); }
+
+  .assistant-card:hover {
+    border-color: rgba(255,255,255,0.1);
+    background: var(--bg-card-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  }
+
+  .assistant-card-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .assistant-icon-wrap {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .assistant-badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+    background: rgba(0,210,255,0.08);
+    border: 1px solid rgba(0,210,255,0.15);
+    padding: 3px 8px;
+    border-radius: var(--radius-pill);
+  }
+
+  .assistant-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    letter-spacing: -0.2px;
+  }
+
+  .assistant-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    font-weight: 300;
+    margin-bottom: 18px;
+  }
+
+  .assistant-link {
+    font-size: 12px;
+    color: var(--accent-cyan);
+    font-weight: 500;
+    display: inline-flex; align-items: center; gap: 5px;
+    text-decoration: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .assistant-link:hover { opacity: 1; }
+
+  /* ── STATS BAR ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+    margin-bottom: 100px;
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 48px;
+  }
+
+  .stat-cell {
+    background: var(--bg-deep);
+    padding: 32px;
+    text-align: center;
+  }
+
+  .stat-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .stat-num span { color: var(--accent-cyan); -webkit-text-fill-color: var(--accent-cyan); }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 40px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    max-width: 100%;
+  }
+
+  .footer-logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--text-secondary);
+  }
+
+  .footer-copy {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── GRADIENT ORBS ── */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+    animation: orb-drift 20s ease infinite alternate;
+  }
+
+  .orb-1 {
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(0,102,255,0.12) 0%, transparent 70%);
+    top: -200px; left: -100px;
+  }
+
+  .orb-2 {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,210,255,0.08) 0%, transparent 70%);
+    top: 100px; right: -150px;
+    animation-delay: -8s;
+  }
+
+  .orb-3 {
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%);
+    bottom: 0; left: 30%;
+    animation-delay: -4s;
+  }
+
+  @keyframes orb-drift {
+    from { transform: translate(0,0) scale(1); }
+    to   { transform: translate(30px,20px) scale(1.05); }
+  }
+
+  /* ── FEATURE STRIP ── */
+  .feature-strip {
+    padding: 0 48px 100px;
+    max-width: 1280px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .feature-block {
+    padding: 32px;
+    border-radius: var(--radius-card);
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, var(--bg-card) 0%, rgba(10,21,32,0.5) 100%);
+    transition: all 0.3s;
+  }
+
+  .feature-block:hover {
+    border-color: var(--border-glow);
+    transform: translateY(-2px);
+  }
+
+  .feature-num {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent-cyan);
+    margin-bottom: 16px;
+  }
+
+  .feature-block-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 10px;
+    letter-spacing: -0.3px;
+  }
+
+  .feature-block-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    font-weight: 300;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-void); }
+  ::-webkit-scrollbar-thumb { background: #1a2a38; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #24384a; }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="page-wrap">
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-icon">⚡</div>
+    AI Platform
+  </div>
+  <ul class="nav-links">
+    <li><a href="#">Platform</a></li>
+    <li><a href="#">RAG Types</a></li>
+    <li><a href="#">Templates</a></li>
+    <li><a href="#">Enterprise</a></li>
+    <li><a href="#">Docs</a></li>
+  </ul>
+  <div class="nav-cta">
+    <button class="btn-ghost">Sign In</button>
+    <button class="btn-primary">Get Started</button>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+
+  <div class="hero-badge">
+    <div class="hero-badge-dot"></div>
+    Enterprise AI Infrastructure — Now Available
+  </div>
+
+  <h1>Deploy <span class="highlight">AI Experiences</span><br>With Enterprise Design</h1>
+  <p class="hero-sub">Build branded AI assistants and RAG-powered pages in minutes. No code. Secure by design. Tailored to your enterprise content.</p>
+
+  <div class="hero-actions">
+    <button class="btn-hero-primary">Build Custom RAG ↗</button>
+    <button class="btn-hero-ghost">▶ &nbsp;Watch Demo</button>
+  </div>
+
+  <!-- Scrolling chips -->
+  <div class="type-scroll-wrap">
+    <div class="type-scroll-track" id="chipTrack"></div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="stats-bar" style="margin-bottom: 0; padding: 0 48px;">
+  <div class="stat-cell fade-in">
+    <div class="stat-num">13<span>+</span></div>
+    <div class="stat-label">RAG Architectures</div>
+  </div>
+  <div class="stat-cell fade-in" style="transition-delay:0.1s">
+    <div class="stat-num">99<span>%</span></div>
+    <div class="stat-label">Uptime SLA</div>
+  </div>
+  <div class="stat-cell fade-in" style="transition-delay:0.2s">
+    <div class="stat-num"><span>&lt;</span>50ms</div>
+    <div class="stat-label">Avg. Response</div>
+  </div>
+  <div class="stat-cell fade-in" style="transition-delay:0.3s">
+    <div class="stat-num">0<span>×</span></div>
+    <div class="stat-label">Code Required</div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<div class="feature-strip" style="padding-top: 80px;">
+  <div class="feature-block fade-in">
+    <div class="feature-num">01 — ARCHITECTURE</div>
+    <div class="feature-block-title">Hybrid Retrieval Pipelines</div>
+    <div class="feature-block-desc">Combine dense vector search with sparse BM25 keyword retrieval for best-in-class accuracy across any document corpus.</div>
+  </div>
+  <div class="feature-block fade-in" style="transition-delay:0.1s">
+    <div class="feature-num">02 — BRANDING</div>
+    <div class="feature-block-title">White-label Ready</div>
+    <div class="feature-block-desc">Every assistant is fully customizable — colors, fonts, tone of voice, logo. Deploy under your own brand with zero friction.</div>
+  </div>
+  <div class="feature-block fade-in" style="transition-delay:0.2s">
+    <div class="feature-num">03 — SECURITY</div>
+    <div class="feature-block-title">Enterprise-grade Access Control</div>
+    <div class="feature-block-desc">Role-based permissions, audit logging, SSO integration, and data residency options built in from the ground up.</div>
+  </div>
+</div>
+
+<!-- RAG TYPES -->
+<section class="section">
+  <div class="section-header-row fade-in">
+    <div>
+      <div class="section-label">RAG Types</div>
+      <h2 class="section-title">Choose Your Architecture</h2>
+      <p class="section-desc">Thirteen specialized retrieval patterns, each optimized for a different use case and data type.</p>
+    </div>
+    <button class="btn-ghost">Tap a card to learn more →</button>
+  </div>
+
+  <div class="rag-grid" id="ragGrid"></div>
+</section>
+
+<div class="section-divider"><div class="divider-line"></div></div>
+
+<!-- ASSISTANT TEMPLATES -->
+<section class="section">
+  <div class="section-header-row fade-in">
+    <div>
+      <div class="section-label">Assistant Templates</div>
+      <h2 class="section-title">Ready in Minutes</h2>
+      <p class="section-desc">Production-ready templates for every department. Fully branded. No engineering required.</p>
+    </div>
+    <button class="btn-ghost">Ready for branding and voice →</button>
+  </div>
+
+  <div class="assistant-grid" id="assistantGrid"></div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">AI Platform</div>
+  <div class="footer-copy">© 2025 Enterprise AI. All rights reserved.</div>
+  <div style="display:flex;gap:24px;">
+    <a href="#" style="font-size:12px;color:var(--text-muted);text-decoration:none;">Privacy</a>
+    <a href="#" style="font-size:12px;color:var(--text-muted);text-decoration:none;">Terms</a>
+    <a href="#" style="font-size:12px;color:var(--text-muted);text-decoration:none;">Contact</a>
+  </div>
+</footer>
+
+</div><!-- /page-wrap -->
+
+<script>
+/* ── CANVAS GRID ── */
+const canvas = document.getElementById('bg-canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+function drawGrid() {
+  ctx.clearRect(0,0,W,H);
+  const size = 60;
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)';
+  ctx.lineWidth = 1;
+  for(let x=0; x<W; x+=size) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0; y<H; y+=size) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+drawGrid();
+window.addEventListener('resize', drawGrid);
+
+/* ── DATA ── */
+const ragTypes = [
+  { icon:'🔍', color:'icon-cyan',   title:'Standard RAG',       desc:'Dense vector search for precise fact retrieval and answering.',          tag:'Core' },
+  { icon:'⚡', color:'icon-blue',   title:'Hybrid RAG',         desc:'Combines keyword & vector search for maximum recall and precision.',       tag:'Recommended' },
+  { icon:'💬', color:'icon-purple', title:'Conversational RAG', desc:'Maintains long-term context and full chat history across sessions.',        tag:'Core' },
+  { icon:'🎨', color:'icon-green',  title:'Multi-RAG',          desc:'Seamlessly retrieves images, audio, and video across modalities.',          tag:'Advanced' },
+  { icon:'🕸', color:'icon-cyan',   title:'Graph RAG',          desc:'Deep reasoning across knowledge graphs and entity relationships.',           tag:'Advanced' },
+  { icon:'🤖', color:'icon-orange', title:'Agentic RAG',        desc:'Reasoning agents that plan, use tools, and execute multi-step tasks.',      tag:'Advanced' },
+  { icon:'⚙️', color:'icon-blue',   title:'Real-time RAG',      desc:'Ingest new data and answer on fresh content — live and always current.',   tag:'Streaming' },
+  { icon:'👤', color:'icon-purple', title:'Personalized RAG',   desc:'Uses user profile and preferences to tailor every retrieval result.',       tag:'Core' },
+  { icon:'🌐', color:'icon-green',  title:'Cross-lingual RAG',  desc:'Retrieve and answer across documents in multiple languages effortlessly.',  tag:'Global' },
+  { icon:'🎙', color:'icon-cyan',   title:'Voice RAG',          desc:'Voice-styled retrieval with citations — built for audio interfaces.',        tag:'Interface' },
+  { icon:'📋', color:'icon-blue',   title:'Citation RAG',       desc:'Always surfaces sources and citations alongside every answer.',             tag:'Trust' },
+  { icon:'🛡', color:'icon-rose',   title:'Guardrailed RAG',    desc:'Restrict topics and enforce policy guardrails across all interactions.',    tag:'Compliance' },
+];
+
+const assistants = [
+  { icon:'💡', color:'icon-cyan',   title:'FAQ Bot',            desc:'Answers common questions with citations and source references.',            badge:'Core' },
+  { icon:'🎧', color:'icon-blue',   title:'Customer Support',   desc:'Troubleshooting with guided flows and escalation paths.',                   badge:'Popular' },
+  { icon:'💰', color:'icon-green',  title:'Sales Assistant',    desc:'Qualify leads and suggest offerings based on visitor intent.',              badge:'Revenue' },
+  { icon:'🏢', color:'icon-purple', title:'HR Assistant',       desc:'Policies and careers guidance — self-service for every employee.',          badge:'Internal' },
+  { icon:'🔎', color:'icon-orange', title:'Internal Search',    desc:'Find internal docs quickly with semantic search across all systems.',       badge:'Internal' },
+  { icon:'📄', color:'icon-cyan',   title:'Document Q&A',       desc:'Ask questions — access PDFs and structured docs with AI answers.',          badge:'Core' },
+  { icon:'📊', color:'icon-blue',   title:'Data Analyst',       desc:'Explain metrics and trends in plain language from your data sources.',      badge:'Analytics' },
+  { icon:'⚖️', color:'icon-rose',   title:'Compliance Advisor', desc:'Policy, audit, and risk checks — always referencing the latest guidelines.',badge:'Compliance' },
+];
+
+const chipData = [
+  {icon:'🔍',label:'Standard RAG'},{icon:'⚡',label:'Hybrid RAG'},{icon:'💬',label:'Conversational'},
+  {icon:'🎨',label:'Multi-RAG'},{icon:'🕸',label:'Graph RAG'},{icon:'🤖',label:'Agentic'},
+  {icon:'⚙️',label:'Real-time'},{icon:'👤',label:'Personalized'},{icon:'🌐',label:'Cross-lingual'},
+  {icon:'🎙',label:'Voice RAG'},{icon:'📋',label:'Citation RAG'},{icon:'🛡',label:'Guardrailed'},
+  {icon:'🏢',label:'HR Assistant'},{icon:'📄',label:'Document Q&A'},
+];
+
+/* ── RENDER CHIPS ── */
+const track = document.getElementById('chipTrack');
+const doubleChips = [...chipData,...chipData];
+doubleChips.forEach(c => {
+  const el = document.createElement('div');
+  el.className = 'type-chip';
+  el.innerHTML = `<span class="chip-icon">${c.icon}</span>${c.label}`;
+  track.appendChild(el);
+});
+
+/* ── RENDER RAG GRID ── */
+const ragGrid = document.getElementById('ragGrid');
+ragTypes.forEach((r, i) => {
+  const card = document.createElement('div');
+  card.className = 'rag-card fade-in';
+  card.style.transitionDelay = (i * 0.05) + 's';
+  card.innerHTML = `
+    <div class="rag-card-head">
+      <div class="rag-card-icon ${r.color}">${r.icon}</div>
+      <div class="rag-card-meta">
+        <div class="rag-card-title">${r.title}</div>
+        <div class="rag-card-status"><span class="rag-card-status-dot"></span>Ready to Deploy</div>
+      </div>
+    </div>
+    <div class="rag-card-desc">${r.desc}</div>
+    <div class="rag-card-footer">
+      <span class="rag-card-tag">${r.tag}</span>
+      <div class="rag-card-arrow">→</div>
+    </div>
+  `;
+  ragGrid.appendChild(card);
+});
+
+/* ── RENDER ASSISTANT GRID ── */
+const agrid = document.getElementById('assistantGrid');
+assistants.forEach((a, i) => {
+  const card = document.createElement('div');
+  card.className = 'assistant-card fade-in';
+  card.style.transitionDelay = (i * 0.06) + 's';
+  card.innerHTML = `
+    <div class="assistant-card-head">
+      <div class="assistant-icon-wrap ${a.color}">${a.icon}</div>
+      <span class="assistant-badge">${a.badge}</span>
+    </div>
+    <div class="assistant-title">${a.title}</div>
+    <div class="assistant-desc">${a.desc}</div>
+    <a class="assistant-link" href="#">Explore template →</a>
+  `;
+  agrid.appendChild(card);
+});
+
+/* ── SCROLL REVEAL ── */
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

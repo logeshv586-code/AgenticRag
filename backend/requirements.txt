@@ -2,12 +2,8 @@ fastapi
 uvicorn
 pydantic
 python-multipart
-langchain
-langchain-community
 beautifulsoup4
 pdfplumber
-pinecone-client
-chromadb
 openai
 sentence-transformers
 pytesseract
@@ -15,3 +11,27 @@ Pillow
 requests
 haystack-ai
 haystack-experimental
+lxml
+python-docx
+chromadb
+chroma-haystack
+faiss-cpu
+anthropic
+playwright
+pinecone-client
+qdrant-client
+elasticsearch
+# === Phase 1: Modular Backend ===
+langdetect
+deep-translator
+edge-tts
+networkx
+# faster-whisper  # Optional: local STT (requires separate install)
+# pyttsx3         # Optional: local TTS fallback
+# spacy           # Optional: entity extraction for Graph RAG
+# neo4j           # Optional: cloud graph store
+# === Phase 2: Database Layer ===
+# pgvector-haystack  # Optional: PGVector integration
+# redis-haystack     # Optional: Redis vector search
+# === Phase 3: Model Layer ===
+# ollama             # Optional: Ollama integration (install via ollama.ai)

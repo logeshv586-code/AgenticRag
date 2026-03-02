@@ -1,39 +1,248 @@
-# Python FastAPI Backend Implementation Plan
+# End-to-End RAG System Enhancement
 
-## Goal Description
-Build a Python backend using FastAPI to support the Agentic RAG Creation UI. The backend will handle processing data sources (scraping websites, reading uploaded documents), use a local LLM to converse with the user and determine the RAG configuration (e.g., Pinecone, ChromaDB), and finally create and deploy the customized RAG system.
+This plan transforms the current prototype-level AgenticRag project into a fully functional, production-ready RAG configurator. The current backend uses InMemory document stores with largely mocked integrations; the frontend has UI scaffolding but missing configurations for most RAG types and no API key management. This plan covers all 10 feature areas the user requested.
+
+## User Review Required
+
+> [!IMPORTANT]
+> This is a **very large** project touching ~15 files across backend and frontend. The plan is structured into 3 phases that should be implemented sequentially. Some features (like real Qdrant/Elasticsearch integration) require external service credentials—these will be optional with graceful fallbacks.
+
+> [!WARNING]
+> **Breaking changes**: The [DeployRequest](file:///c:/Users/e629/Documents/AgenticRag/backend/main.py#74-89) model in [main.py](file:///c:/Users/e629/Documents/AgenticRag/backend/main.py) will be extended with new fields (`apiKeys`, `privacyMode`, `explainability`). Existing deploy calls from the frontend will be updated to match. The deployment flow will also change to support hybrid deployment.
+
+---
 
 ## Proposed Changes
 
-### 1. Project Setup
-#### [NEW] `backend/requirements.txt`(file:///c:/Users/e629/Documents/AgenticRag/backend/requirements.txt)
-- `fastapi`, `uvicorn`, `pydantic`, `python-multipart`
-- `langchain`, `langchain-community`, `beautifulsoup4` (for scraping)
-- `pdfplumber` or `PyPDF2` (for document reading)
-- `pinecone-client`, `chromadb` (Vector DBs)
+### Phase 1: Backend Foundation
 
-#### [NEW] `backend/main.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/main.py)
-- Set up FastAPI app with CORS middleware.
-- Implement endpoints:
-  - `POST /api/scrape`: Accepts URLs, uses BeautifulSoup/Langchain loaders to extract text, and splits into chunks.
-  - `POST /api/upload`: Accepts file uploads (PDF, TXT, DOCX), extracts text, and prepares it for embeddings.
-  - `POST /api/chat`: Interacts with a local LLM to guide the user in selecting RAG features (Vector DB, Persona, Architecture) and answer questions about RAG types.
-  - `POST /api/deploy`: Takes the parsed documents/URLs and chosen configuration, embeds the data, stores it in the selected Vector DB (Pinecone, ChromaDB), and returns the final RAG endpoint details.
+---
 
-### 2. File / Module Structure
-#### [NEW] `backend/services/scraper.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/scraper.py)
-Logic for web scraping and text extraction.
+#### [NEW] [vector_store_manager.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/vector_store_manager.py)
 
-#### [NEW] `backend/services/document_parser.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/document_parser.py)
-Logic for reading uploaded files.
+Central module for vector store creation and management:
+- Factory function `create_document_store(config)` that returns the right store based on `dbType`, `cloudDb`, `localDb`
+- **ChromaDB**: Real `chromadb.PersistentClient` integration with collection management
+- **FAISS**: FAISS index creation with `faiss-cpu`, document serialization
+- **Qdrant** (NEW cloud option): `qdrant-client` integration with API key support
+- **Elasticsearch** (NEW cloud option): `elasticsearch` client integration
+- **Hybrid mode**: Returns a tuple of (cloud_store, local_store) for dual retrieval
+- **InMemory fallback**: Keeps current InMemory store as default
 
-#### [NEW] `backend/services/rag_builder.py`(file:///c:/Users/e629/Documents/AgenticRag/backend/services/rag_builder.py)
-Logic to initialize the specified Vector DB, embed the processed text, and configure the conversational chain.
+#### [NEW] [embedding_service.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/embedding_service.py)
+
+Embedding model management:
+- `get_embedder(model_id, api_key=None)` factory that returns Haystack-compatible embedders
+- **Local BGE**: Uses `sentence-transformers` with `BAAI/bge-m3` model
+- **OpenAI Ada**: Uses OpenAI embeddings API with user-provided key
+- **Mistral** (NEW option): Mistral embeddings via API
+
+#### [NEW] [llm_service.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/llm_service.py)
+
+LLM provider management:
+- `get_generator(model_id, api_key=None)` factory
+- **Qwen local**: Current llama_cpp.server OpenAI-compatible endpoint
+- **Mistral local** (NEW): Support for loading Mistral GGUF via llama_cpp
+- **OpenAI GPT-4o**: Real OpenAI API integration with user key
+- **Anthropic Claude**: Real Anthropic API integration with user key
+- Key validation endpoint: `validate_api_key(provider, key)` 
+
+#### [MODIFY] [scraper.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/scraper.py)
+
+Enhance to support dynamic (JS-rendered) pages:
+- Add `scrape_mode` parameter: `"static"` (current BeautifulSoup) or `"dynamic"` 
+- Dynamic mode uses `playwright` (async) to render JS before extracting content
+- Add `scrape_sitemap()` to crawl entire sites via sitemap.xml
+- Better content extraction: prioritize `<article>`, `<main>`, structured data
+
+#### [MODIFY] [document_parser.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/document_parser.py)
+
+Expand document type support:
+- Add **DOCX** parsing via `python-docx`
+- Add **CSV** parsing with intelligent column extraction
+- Add **HTML** file parsing (local HTML files)
+- Add **Markdown** parsing
+- Improve OCR: configure Tesseract path, add image preprocessing for better results
+
+#### [MODIFY] [haystack_service.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/haystack_service.py)
+
+Major rewrite to support real pipelines:
+- Use `vector_store_manager` for real document stores instead of InMemory
+- Use `embedding_service` for real embeddings
+- Use `llm_service` for real LLM generators
+- Implement **real DocumentSplitter** with configurable chunk size/overlap
+- Implement proper pipeline building for each RAG type:
+  - **Basic**: Standard retriever → prompt → LLM
+  - **Conversational**: Add chat memory via Haystack's `ChatMessageWriter/Reader`
+  - **Agentic**: Tool-calling with Haystack's `ToolInvoker` component  
+  - **Graph RAG**: Knowledge graph construction with entity extraction
+  - **Multimodal**: Multi-modal document handling
+  - **Cross-lingual**: Translation component before/after retrieval
+  - **Citation**: Source tracking in prompt template
+  - **Real-time**: Streaming pipeline support
+  - **Personalized**: User profile-based retrieval filtering
+  - **Voice**: STT/TTS integration points
+- Add **reranker** implementation using `TransformersSimilarityRanker`
+- Add **explainability**: Return retrieval scores and source documents with answers
+- **Privacy mode**: Strip PII from responses when enabled
+
+#### [MODIFY] [rag_builder.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/rag_builder.py)
+
+Expand deployment capabilities:
+- **API deployment**: Generate FastAPI router with query endpoint (current behavior, enhanced)
+- **Offline deployment**: Serialize pipeline to YAML + package dependencies list
+- **Hybrid**: Both API + offline artifact
+- Return comprehensive deployment metadata
+
+#### [MODIFY] [agentic_logic.py](file:///c:/Users/e629/Documents/AgenticRag/backend/services/agentic_logic.py)
+
+Implement real agentic capabilities:
+- Define tool functions (web search, calculator, calendar lookup)
+- Build agentic pipeline with tool routing
+- Decision-making loop for multi-step reasoning
+
+#### [MODIFY] [main.py](file:///c:/Users/e629/Documents/AgenticRag/backend/main.py)
+
+Update API layer:
+- Extend [DeployRequest](file:///c:/Users/e629/Documents/AgenticRag/backend/main.py#74-89) with: `apiKeys: dict`, `privacyMode: bool`, `explainability: bool`, `scrapeMode: str`
+- Add `POST /api/validate-key` endpoint for API key validation
+- Update `/api/visualize/{pipeline_id}` to return real pipeline graph data
+- Add `POST /api/scrape` to accept `mode` param (static/dynamic)
+- Enhanced error handling and logging
+
+#### [MODIFY] [requirements.txt](file:///c:/Users/e629/Documents/AgenticRag/backend/requirements.txt)
+
+Add new dependencies:
+```
+playwright
+python-docx
+faiss-cpu
+qdrant-client
+elasticsearch
+anthropic
+```
+
+---
+
+### Phase 2: Frontend Enhancements
+
+---
+
+#### [MODIFY] [CreateRagModal.jsx](file:///c:/Users/e629/Documents/AgenticRag/chatbotui/src/components/CreateRagModal.jsx)
+
+Major enhancements across all 10 steps:
+
+**Step 1 (Data Ingestion)**:
+- Add toggle: "Static Pages" vs "Dynamic Pages (JS-rendered)" 
+- Show description explaining when to use each mode
+
+**Step 2 (Vector Storage)**:
+- Add **Qdrant** and **Elasticsearch** to `CLOUD_DBS` array
+- Allow **multi-select** for local DBs when hybrid is chosen (Chroma + FAISS together)
+
+**Step 3 (Architecture)**:
+- Update RAG type descriptions to match actual backend capabilities
+
+**Step 4 (Dynamic Config)** — Add missing config panels:
+- **Cross-lingual**: Language picker (source/target languages) 
+- **Multimodal**: Supported modality toggles (text, image, audio)
+- **Graph RAG**: Entity types, relationship depth
+- **Real-time**: Refresh interval, streaming toggle
+- **Personalized**: User profile fields
+- **Voice**: Voice language, TTS engine
+- All other RAG types that currently show "No specialized configuration needed"
+
+**Step 5 (Models)**:
+- Add **Mistral** to LLM options
+- Add **API key input fields** that appear when cloud models (OpenAI, Anthropic, Mistral) are selected
+- Add setup guide text for local models (download instructions, VRAM requirements)
+- Add **Mistral embeddings** option
+- API key input for OpenAI embeddings
+
+**Step 6 (Advanced Tuning)** — Friendly labels:
+- Replace "Chunk Size" → **"Detail Level"** with descriptive presets (Brief / Standard / Thorough / Maximum Detail)
+- Replace "Retrieval Top-K" → **"Number of Sources"** with friendly descriptions
+- Keep underlying numeric values, just change the label and add preset buttons
+- Add tooltip explanations
+
+**Step 7 (Features & Themes)**:
+- Add **Explainability** toggle ("Show why results were chosen")
+- Add **Privacy Mode** toggle ("Strip personal data from responses")
+- Add new themes: **Ruby Red**, **Ocean Teal**, **Solar Orange**
+- Add **font selection** (Inter, Roboto, Outfit, JetBrains Mono)
+- Add mini theme preview card showing what the bot UI will look like
+
+**Step 9 (Deployment)**:
+- Add **Hybrid** deployment option (Cloud API + Offline Binary together)
+
+#### [MODIFY] [RagVisualizer.jsx](file:///c:/Users/e629/Documents/AgenticRag/chatbotui/src/components/RagVisualizer.jsx)
+
+Complete rewrite to show the full pipeline:
+- **Data Ingestion node**: Show scrape mode (static/dynamic), file types
+- **Embedding node**: Show selected embedding model
+- **Vector Store node**: Show selected DB(s) with cloud/local indicator
+- **Retriever node**: Show retrieval strategy and Top-K
+- **Reranker node** (conditional): Show when reranker is enabled
+- **Prompt Builder node**: Show RAG type influence
+- **LLM node**: Show selected model
+- **Features node**: Show enabled features (explainability, citations, etc.)
+- **Deployment node**: Show deployment type
+- Animated connection lines between nodes
+- Color-coded by component type
+
+#### [MODIFY] [index.css](file:///c:/Users/e629/Documents/AgenticRag/chatbotui/src/index.css)
+
+Add styles for new themes and components:
+- New theme color variables for Ruby Red, Ocean Teal, Solar Orange
+- Font-face declarations for custom fonts
+- Theme preview card styles
+- Enhanced tooltip styles
+
+---
+
+### Phase 3: Integration
+
+---
+
+#### [MODIFY] [App.jsx](file:///c:/Users/e629/Documents/AgenticRag/chatbotui/src/App.jsx)
+
+- Pass new config fields (apiKeys, privacyMode, explainability, scrapeMode) through to deploy
+- Update deploy flow to handle hybrid deployment response
+
+---
 
 ## Verification Plan
+
 ### Manual Verification
-- Start the FastAPI server (`uvicorn main:app --reload`).
-- Test `/api/scrape` with a sample URL via Swagger UI (`/docs`).
-- Test `/api/upload` by uploading a PDF file.
-- Test `/api/chat` to ensure the local LLM logic provides appropriate responses regarding RAG configuration.
-- Trigger the frontend creation flow and verify it successfully hits the `/api/deploy` endpoint to initialize the RAG.
+
+Since this project has no existing test infrastructure and is a full-stack application with complex UI interactions, verification will be primarily manual:
+
+1. **Backend startup test**: 
+   - Run `cd c:\Users\e629\Documents\AgenticRag\backend && python -m uvicorn main:app --reload --port 8000`
+   - Verify `/health` returns `{"status": "ok"}`
+   - Verify no import errors on startup
+
+2. **Frontend build test**:
+   - Run `cd c:\Users\e629\Documents\AgenticRag\chatbotui && npm run build`
+   - Verify build succeeds with no errors
+
+3. **UI walkthrough** (browser-based):
+   - Run frontend dev server: `npm run dev`
+   - Open the RAG Factory wizard
+   - Walk through all 10 steps verifying:
+     - Step 1: Static/Dynamic toggle appears, file upload works
+     - Step 2: Qdrant and Elasticsearch appear in cloud options, multi-select works for hybrid
+     - Step 4: All RAG types show config panels (cross-lingual shows language picker, etc.)
+     - Step 5: API key inputs appear for cloud models, Mistral option exists
+     - Step 6: Friendly labels appear (Detail Level, Number of Sources)
+     - Step 7: New themes (Red, Teal, Orange) appear, explainability & privacy toggles present
+     - Step 8: Full pipeline visualization with all nodes
+     - Step 9: Hybrid deployment option visible
+
+4. **Deploy flow test**:
+   - Configure a basic RAG with local Chroma + Qwen
+   - Enter a URL and deploy
+   - Verify pipeline is created and test-chat works
+
+> [!NOTE]  
+> Real cloud integrations (Qdrant, Elasticsearch, OpenAI, Anthropic) require API keys and running services. These should be tested by the user with their own credentials. The implementation will include graceful fallbacks when keys are not provided.

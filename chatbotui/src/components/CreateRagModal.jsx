@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers } from 'lucide-react';
+import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers, Shield, Eye, Zap, Languages, Mic, BookOpen, Key } from 'lucide-react';
 import RagVisualizer from './RagVisualizer';
 
 const DB_TYPES = [
@@ -11,7 +11,9 @@ const DB_TYPES = [
 const CLOUD_DBS = [
   { id: 'pinecone', name: 'Pinecone', desc: 'Managed, scalable. Best for large-scale datasets.' },
   { id: 'weaviate', name: 'Weaviate', desc: 'Flexible, open-source. Trusted for government and secure data.' },
-  { id: 'milvus', name: 'Milvus', desc: 'Cloud-native, distributed. Optimized for enterprise AI workloads.' }
+  { id: 'milvus', name: 'Milvus', desc: 'Cloud-native, distributed. Optimized for enterprise AI workloads.' },
+  { id: 'qdrant', name: 'Qdrant', desc: 'High-performance vector search. Great for filtering and hybrid queries.' },
+  { id: 'elasticsearch', name: 'Elasticsearch', desc: 'Full-text + vector search. Ideal for enterprise with existing ES infrastructure.' }
 ];
 
 const LOCAL_DBS = [
@@ -33,21 +35,30 @@ const RAG_TYPES = [
 ];
 
 const LLM_MODELS = [
-  { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private computing.' },
-  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.' },
-  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.' }
+  { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private. No API key needed.', provider: 'local', setup: 'Requires ~10GB VRAM. Model auto-loaded from local GGUF file.' },
+  { id: 'mistral-local', name: 'Local Mistral 7B', desc: 'Offline, fast inference.', provider: 'local', setup: 'Requires ~6GB VRAM. Download GGUF from HuggingFace.' },
+  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.', provider: 'openai', setup: 'Requires OpenAI API key.' },
+  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.', provider: 'anthropic', setup: 'Requires Anthropic API key.' },
+  { id: 'gemini', name: 'Google Gemini Pro', desc: 'Cloud, multimodal ready.', provider: 'gemini', setup: 'Requires Google AI API key.' }
 ];
 
 const EMBEDDING_MODELS = [
-  { id: 'bge-local', name: 'Local BGE-m3', desc: 'Offline, dense embeddings.' },
-  { id: 'openai-ada', name: 'OpenAI text-embedding-ada-002', desc: 'Cloud standard.' },
+  { id: 'bge-local', name: 'Local BGE-m3', desc: 'Offline, dense embeddings. No key needed.', provider: 'local' },
+  { id: 'openai-ada', name: 'OpenAI text-embedding-ada-002', desc: 'Cloud standard.', provider: 'openai' },
+  { id: 'mistral-embed', name: 'Mistral Embeddings', desc: 'Cloud, multilingual.', provider: 'mistral' },
 ];
 
 const FEATURES = [
-  { id: 'multilingual', name: 'Multi-lingual Support' },
-  { id: 'citations', name: 'Source Citations' },
-  { id: 'sentiment', name: 'Sentiment Analysis' },
-  { id: 'voice', name: 'Voice Interaction Ready' },
+  { id: 'multilingual', name: 'Multi-lingual Support', icon: Languages },
+  { id: 'citations', name: 'Source Citations', icon: BookOpen },
+  { id: 'sentiment', name: 'Sentiment Analysis', icon: Eye },
+  { id: 'voice', name: 'Voice Interaction Ready', icon: Mic },
+  { id: 'explainability', name: 'Explainability', icon: Eye, desc: 'Show why results were chosen' },
+  { id: 'privacy', name: 'Privacy Mode', icon: Shield, desc: 'Strip personal data from responses' },
+  { id: 'hallucinationGuard', name: 'Hallucination Guard', icon: Shield, desc: 'Strict confidence thresholds for answers' },
+  { id: 'toxicityFilter', name: 'Toxicity Filter', icon: Shield, desc: 'Filter harmful inputs/outputs' },
+  { id: 'structuredOutput', name: 'Structured JSON Output', icon: Code, desc: 'Force LLM to reply in JSON format' },
+  { id: 'streamingResponse', name: 'Streaming Response', icon: Zap, desc: 'Stream tokens as they are generated' },
 ];
 
 const THEMES = [
@@ -56,6 +67,21 @@ const THEMES = [
   { id: 'emerald', name: 'Emerald', hue: 120, color: '#10b981' },
   { id: 'violet', name: 'Deep Violet', hue: 250, color: '#8b5cf6' },
   { id: 'gold', name: 'Luxury Gold', hue: 45, color: '#fbbf24' },
+  { id: 'red', name: 'Ruby Red', hue: 0, color: '#ef4444' },
+  { id: 'teal', name: 'Ocean Teal', hue: 175, color: '#14b8a6' },
+  { id: 'orange', name: 'Solar Orange', hue: 25, color: '#f97316' },
+];
+
+const DETAIL_LEVELS = [
+  { label: 'Brief', value: 200, desc: 'Quick answers, fewer details' },
+  { label: 'Standard', value: 500, desc: 'Balanced detail and speed' },
+  { label: 'Thorough', value: 1000, desc: 'Detailed, comprehensive answers' },
+  { label: 'Maximum', value: 2000, desc: 'Deep analysis of every detail' },
+];
+
+const LANGUAGES = [
+  'English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese',
+  'Korean', 'Arabic', 'Hindi', 'Portuguese', 'Russian', 'Italian'
 ];
 
 export default function CreateRagModal({ isOpen, onClose, onComplete, initialConfig }) {
@@ -90,8 +116,15 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
     theme: THEMES[0].id,
 
     // Step 9: Deployment Type
-    deploymentType: 'api'
+    deploymentType: 'api',
+
+    // New fields
+    scrapeMode: 'static',
+    apiKeys: {},
+    privacyMode: false,
+    explainability: false,
   });
+  const [tuningMode, setTuningMode] = useState('simple'); // 'simple' or 'expert'
   const [deployData, setDeployData] = useState(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployProgress, setDeployProgress] = useState(0);
@@ -193,7 +226,11 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
           useReranker: config.useReranker,
           theme: config.theme,
           features: config.features,
-          deploymentType: config.deploymentType
+          deploymentType: config.deploymentType,
+          apiKeys: config.apiKeys,
+          privacyMode: config.privacyMode,
+          explainability: config.explainability,
+          scrapeMode: config.scrapeMode
         })
       });
 
@@ -280,6 +317,24 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     </div>
                   ))}
                   <button onClick={() => updateConfig('urls', [...config.urls, ''])} className="text-sm text-cyan-400 hover:text-cyan-300 font-medium transition">+ Add another URL</button>
+                </div>
+
+                {/* Scrape Mode Toggle */}
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => updateConfig('scrapeMode', 'static')}
+                    className={`flex-1 p-3 rounded-xl border text-center transition-all duration-300 ${config.scrapeMode === 'static' ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300' : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white'}`}
+                  >
+                    <div className="text-sm font-bold">Static Pages</div>
+                    <div className="text-[10px] text-zinc-500 mt-1">Fast extraction via HTML parsing</div>
+                  </button>
+                  <button
+                    onClick={() => updateConfig('scrapeMode', 'dynamic')}
+                    className={`flex-1 p-3 rounded-xl border text-center transition-all duration-300 ${config.scrapeMode === 'dynamic' ? 'bg-purple-500/10 border-purple-500/40 text-purple-300' : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white'}`}
+                  >
+                    <div className="text-sm font-bold">Dynamic Pages</div>
+                    <div className="text-[10px] text-zinc-500 mt-1">JS-rendered via headless browser</div>
+                  </button>
                 </div>
               </div>
 
@@ -478,10 +533,97 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     </div>
                   </div>
                 )}
-                {/* Fallback for others currently just standard configs */}
-                {!['conversational', 'agentic', 'citation'].includes(config.ragType) && (
+                {config.ragType === 'crosslingual' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism space-y-4">
+                    <h4 className="text-sm font-bold text-white text-premium">Language Settings</h4>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Source Language</label>
+                      <select value={config.dynamicConfig?.sourceLanguage || 'auto'} onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, sourceLanguage: e.target.value } }))} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="auto">Auto-detect</option>
+                        {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Target Language</label>
+                      <select value={config.dynamicConfig?.targetLanguage || 'English'} onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, targetLanguage: e.target.value } }))} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm">
+                        {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'multimodal' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism">
+                    <h4 className="text-sm font-bold text-white mb-3 text-premium">Supported Modalities</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {['text', 'images', 'audio', 'video', 'tables'].map(mod => (
+                        <button key={mod} onClick={() => toggleDynamicConfig('modalities', mod)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${(config.dynamicConfig?.modalities || ['text']).includes(mod) ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300' : 'bg-white/5 border-white/5 text-zinc-400'}`}>
+                          {mod.charAt(0).toUpperCase() + mod.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'structured' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism space-y-4">
+                    <h4 className="text-sm font-bold text-white text-premium">Knowledge Graph Settings</h4>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Entity Types to Extract</label>
+                      <div className="flex flex-wrap gap-2">
+                        {['Person', 'Organization', 'Location', 'Concept', 'Event', 'Product'].map(ent => (
+                          <button key={ent} onClick={() => toggleDynamicConfig('entityTypes', ent)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${(config.dynamicConfig?.entityTypes || []).includes(ent) ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300' : 'bg-white/5 border-white/5 text-zinc-400'}`}>
+                            {ent}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Relationship Depth: {config.dynamicConfig?.relationshipDepth || 2} hops</label>
+                      <input type="range" min="1" max="5" value={config.dynamicConfig?.relationshipDepth || 2} onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, relationshipDepth: parseInt(e.target.value) } }))} className="w-full accent-emerald-500" />
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'realtime' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism space-y-4">
+                    <h4 className="text-sm font-bold text-white text-premium">Real-Time Settings</h4>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Refresh Interval: {config.dynamicConfig?.refreshInterval || 60}s</label>
+                      <input type="range" min="5" max="300" step="5" value={config.dynamicConfig?.refreshInterval || 60} onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, refreshInterval: parseInt(e.target.value) } }))} className="w-full accent-cyan-500" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div><div className="text-sm text-white">Enable Streaming</div><div className="text-xs text-zinc-500">Stream responses as they generate</div></div>
+                      <button onClick={() => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, streaming: !prev.dynamicConfig?.streaming } }))} className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${config.dynamicConfig?.streaming ? 'bg-cyan-500' : 'bg-zinc-700'}`}>
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.dynamicConfig?.streaming ? 'translate-x-6' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'personalized' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism">
+                    <h4 className="text-sm font-bold text-white mb-3 text-premium">User Profile Fields</h4>
+                    <p className="text-xs text-zinc-500 mb-4">Select what user data the RAG should personalize on.</p>
+                    <div className="flex flex-wrap gap-2">
+                      {['Industry', 'Role', 'Experience Level', 'Preferred Language', 'Topics of Interest', 'Communication Style'].map(field => (
+                        <button key={field} onClick={() => toggleDynamicConfig('profileFields', field)} className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${(config.dynamicConfig?.profileFields || []).includes(field) ? 'bg-purple-500/20 border-purple-500/40 text-purple-300' : 'bg-white/5 border-white/5 text-zinc-400'}`}>
+                          {field}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'voice' && (
+                  <div className="bg-white/5 p-6 rounded-2xl border border-white/5 glass-morphism space-y-4">
+                    <h4 className="text-sm font-bold text-white text-premium">Voice Settings</h4>
+                    <div>
+                      <label className="text-xs text-zinc-400 block mb-2">Voice Language</label>
+                      <select value={config.dynamicConfig?.voiceLanguage || 'en-US'} onChange={(e) => setConfig(prev => ({ ...prev, dynamicConfig: { ...prev.dynamicConfig, voiceLanguage: e.target.value } }))} className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm">
+                        <option value="en-US">English (US)</option><option value="en-GB">English (UK)</option><option value="es-ES">Spanish</option><option value="fr-FR">French</option><option value="de-DE">German</option><option value="ja-JP">Japanese</option><option value="zh-CN">Chinese</option><option value="hi-IN">Hindi</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+                {config.ragType === 'basic' && (
                   <div className="bg-zinc-900/50 p-4 rounded-xl border border-zinc-800 text-center py-8">
-                    <p className="text-sm text-zinc-500 font-medium">No specialized configuration needed for ({config.ragType}). Default settings will be applied.</p>
+                    <p className="text-sm text-zinc-400 font-medium">Standard RAG uses default settings. Fine-tune in the Advanced Tuning step.</p>
                   </div>
                 )}
               </div>
@@ -510,9 +652,30 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         {config.llmModel === m.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                       </div>
                       <p className="text-xs leading-relaxed">{m.desc}</p>
+                      {config.llmModel === m.id && m.setup && <p className="text-[10px] text-zinc-500 mt-2 italic">{m.setup}</p>}
                     </button>
                   ))}
                 </div>
+
+                {/* API Key Input — shown when cloud LLM selected */}
+                {(() => {
+                  const sel = LLM_MODELS.find(m => m.id === config.llmModel);
+                  if (sel && sel.provider !== 'local') {
+                    return (
+                      <div className="mt-4 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                        <label className="text-xs text-zinc-400 flex items-center gap-2 mb-2"><Key className="w-3.5 h-3.5" /> {sel.name} API Key</label>
+                        <input
+                          type="password"
+                          value={config.apiKeys?.[sel.provider] || ''}
+                          onChange={(e) => setConfig(prev => ({ ...prev, apiKeys: { ...prev.apiKeys, [sel.provider]: e.target.value } }))}
+                          placeholder={`Enter your ${sel.provider} API key`}
+                          className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
 
               <div>
@@ -539,52 +702,106 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
 
           {step === 6 && (
             <div className="space-y-6 animate-fade-in relative z-10">
-              <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
-                <Settings2 className="w-5 h-5 text-cyan-400" /> Advanced Tuning
-              </h3>
-              <p className="text-sm text-zinc-400 mb-6">Fine-tune the ingestion and retrieval parameters.</p>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+                  <Settings2 className="w-5 h-5 text-cyan-400" /> Advanced Tuning
+                </h3>
 
-              <div className="bg-white/5 border border-white/5 p-8 rounded-[32px] space-y-8 glass-morphism">
-                <div>
-                  <label className="flex justify-between text-sm font-bold text-white mb-3 text-premium">
-                    Chunk Size <span className="text-cyan-400">{config.chunkSize} tokens</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="100" max="2000" step="100"
-                    value={config.chunkSize}
-                    onChange={(e) => updateConfig('chunkSize', parseInt(e.target.value))}
-                    className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-cyan-500"
-                  />
-                  <p className="text-[10px] text-zinc-500 mt-3 font-medium uppercase tracking-wider">Granularity of knowledge base segments</p>
-                </div>
-
-                <div className="border-t border-zinc-800 pt-5">
-                  <label className="flex justify-between text-sm font-medium text-white mb-2">
-                    Retrieval Top-K <span className="text-cyan-400">{config.topK} docs</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="1" max="20" step="1"
-                    value={config.topK}
-                    onChange={(e) => updateConfig('topK', parseInt(e.target.value))}
-                    className="w-full accent-cyan-500 bg-zinc-800 h-2 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <p className="text-xs text-zinc-500 mt-2">Number of initial documents retrieved from the vector DB.</p>
-                </div>
-
-                <div className="border-t border-zinc-800 pt-5 flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-white">Enable Neural Reranking</div>
-                    <div className="text-xs text-zinc-500 mt-1">Improves relevance by cross-encoding queries with retrieved docs.</div>
-                  </div>
+                {/* Mode Toggle */}
+                <div className="flex bg-zinc-900/50 rounded-lg p-1 border border-zinc-800">
                   <button
-                    onClick={() => updateConfig('useReranker', !config.useReranker)}
-                    className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${config.useReranker ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+                    onClick={() => setTuningMode('simple')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${tuningMode === 'simple' ? 'bg-cyan-500/20 text-cyan-400' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
-                    <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.useReranker ? 'translate-x-6' : 'translate-x-0'}`} />
+                    Simple Mode
+                  </button>
+                  <button
+                    onClick={() => setTuningMode('expert')}
+                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${tuningMode === 'expert' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    Expert Mode
                   </button>
                 </div>
+              </div>
+              <p className="text-sm text-zinc-400 mb-6">Adjust how your AI processes and retrieves information.</p>
+
+              <div className="bg-white/5 border border-white/5 p-8 rounded-[32px] space-y-8 glass-morphism min-h-[300px]">
+
+                {tuningMode === 'simple' ? (
+                  <div className="space-y-4 animate-fade-in">
+                    <h4 className="text-sm font-bold text-white mb-4 text-premium">AI Reasoning Presets</h4>
+                    <div className="grid grid-cols-1 gap-3">
+                      {[
+                        { id: 'fast', name: 'Lightning Fast', desc: 'Prioritizes speed. Uses larger chunks and fewer sources.', icon: Zap, color: 'text-amber-400', bg: 'bg-amber-400/10' },
+                        { id: 'balanced', name: 'Balanced Default', desc: 'The optimal mix of speed and accuracy.', icon: Layers, color: 'text-cyan-400', bg: 'bg-cyan-400/10' },
+                        { id: 'high_accuracy', name: 'High Accuracy', desc: 'Deep analysis. Uses smaller chunks and neural reranking.', icon: Shield, color: 'text-emerald-400', bg: 'bg-emerald-400/10' },
+                        { id: 'deep_analysis', name: 'Maximum Depth', desc: 'Total coverage. Slowest but most comprehensive.', icon: BookOpen, color: 'text-purple-400', bg: 'bg-purple-400/10' },
+                      ].map(preset => (
+                        <button
+                          key={preset.id}
+                          onClick={() => updateConfig('tuningPreset', preset.id)}
+                          className={`p-4 rounded-xl border text-left flex items-start gap-4 transition-all ${config.tuningPreset === preset.id ? 'bg-white/10 border-white/20 ring-1 ring-white/20' : 'bg-zinc-900/50 border-zinc-800 hover:bg-zinc-800'}`}
+                        >
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${preset.bg}`}>
+                            <preset.icon className={`w-5 h-5 ${preset.color}`} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="text-sm font-bold text-white">{preset.name}</span>
+                              {config.tuningPreset === preset.id && <Check className="w-4 h-4 text-white" />}
+                            </div>
+                            <p className="text-xs text-zinc-400">{preset.desc}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-8 animate-fade-in">
+                    <div>
+                      <label className="flex justify-between text-sm font-bold text-white mb-3 text-premium">
+                        Detail Level <span className="text-cyan-400">{DETAIL_LEVELS.find(d => d.value === config.chunkSize)?.label || 'Custom'}</span>
+                      </label>
+                      <div className="grid grid-cols-4 gap-2 mb-3">
+                        {DETAIL_LEVELS.map(d => (
+                          <button key={d.value} onClick={() => { updateConfig('chunkSize', d.value); updateConfig('tuningPreset', null); }}
+                            className={`p-2 rounded-xl border text-center transition-all ${config.chunkSize === d.value ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300' : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white'}`}>
+                            <div className="text-xs font-bold">{d.label}</div>
+                            <div className="text-[9px] text-zinc-500 mt-0.5">{d.desc}</div>
+                          </button>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Controls how finely your documents are segmented ({config.chunkSize} tokens per chunk)</p>
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-5">
+                      <label className="flex justify-between text-sm font-medium text-white mb-2">
+                        Number of Sources <span className="text-cyan-400">{config.topK} documents</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="1" max="20" step="1"
+                        value={config.topK}
+                        onChange={(e) => { updateConfig('topK', parseInt(e.target.value)); updateConfig('tuningPreset', null); }}
+                        className="w-full accent-cyan-500 bg-zinc-800 h-2 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <p className="text-xs text-zinc-500 mt-2">How many source documents to consult when answering. More = thorough but slower.</p>
+                    </div>
+
+                    <div className="border-t border-zinc-800 pt-5 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-white">Enable Neural Reranking</div>
+                        <div className="text-xs text-zinc-500 mt-1">Improves relevance by cross-encoding queries with retrieved docs.</div>
+                      </div>
+                      <button
+                        onClick={() => { updateConfig('useReranker', !config.useReranker); updateConfig('tuningPreset', null); }}
+                        className={`w-12 h-6 rounded-full transition-colors flex items-center px-1 ${config.useReranker ? 'bg-cyan-500' : 'bg-zinc-700'}`}
+                      >
+                        <div className={`w-4 h-4 rounded-full bg-white transition-transform ${config.useReranker ? 'translate-x-6' : 'translate-x-0'}`} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -608,8 +825,11 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         : 'bg-white/5 border-white/5 text-zinc-400 hover:bg-white/10 hover:border-white/10'
                         }`}
                     >
-                      <span className="text-sm font-bold text-premium">{feat.name}</span>
-                      <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition ${isActive ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>
+                      <div className="flex-1">
+                        <span className="text-sm font-bold text-premium">{feat.name}</span>
+                        {feat.desc && <p className="text-[10px] text-zinc-500 mt-0.5">{feat.desc}</p>}
+                      </div>
+                      <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition shrink-0 ${isActive ? 'bg-emerald-500 border-emerald-500' : 'border-white/10'}`}>
                         {isActive && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
                       </div>
                     </button>
@@ -619,15 +839,31 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
 
               <div className="pt-6 border-t border-white/5">
                 <h4 className="text-sm font-semibold text-white mb-4">Bot Theming</h4>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-3">
                   {THEMES.map(theme => (
                     <button
                       key={theme.id}
                       onClick={() => updateConfig('theme', theme.id)}
-                      className={`w-10 h-10 rounded-full transition-transform ${config.theme === theme.id ? 'scale-110 ring-2 ring-offset-2 ring-offset-zinc-950 ring-white' : 'hover:scale-110'}`}
-                      style={{ backgroundColor: theme.color }}
-                    />
+                      className={`flex flex-col items-center gap-1 transition-transform ${config.theme === theme.id ? 'scale-110' : 'hover:scale-105'}`}
+                    >
+                      <div className={`w-10 h-10 rounded-full transition ${config.theme === theme.id ? 'ring-2 ring-offset-2 ring-offset-zinc-950 ring-white' : ''}`} style={{ backgroundColor: theme.color }} />
+                      <span className="text-[9px] text-zinc-500">{theme.name}</span>
+                    </button>
                   ))}
+                </div>
+
+                {/* Theme Preview Card */}
+                <div className="mt-4 p-4 rounded-2xl border border-white/5 glass-morphism" style={{ borderColor: selectedThemeObj?.color + '33' }}>
+                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-2">Preview</div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ backgroundColor: selectedThemeObj?.color + '20' }}>
+                      <Bot className="w-4 h-4" style={{ color: selectedThemeObj?.color }} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">Your RAG Assistant</div>
+                      <div className="text-[10px]" style={{ color: selectedThemeObj?.color }}>Online • {selectedThemeObj?.name} Theme</div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -639,7 +875,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                 <Layers className="w-5 h-5 text-cyan-400" /> Architecture Graph
               </h3>
               <p className="text-sm text-zinc-400 mb-4 shrink-0">Visual summary of your configured multi-agent system.</p>
-              <div className="flex-1 min-h-[350px] border border-white/5 rounded-[32px] overflow-hidden shadow-inner bg-black/40 relative glass-morphism">
+              <div className="flex-1 min-h-[400px] border border-white/5 rounded-[32px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 shadow-inner bg-black/40 relative glass-morphism">
                 <RagVisualizer config={config} />
               </div>
             </div>
@@ -679,6 +915,19 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                   </div>
                   <h4 className="font-bold text-lg text-white mb-2 text-premium">Offline Edge Binary</h4>
                   <p className="text-sm text-zinc-500 leading-relaxed">Serialize the Haystack pipeline for air-gapped deployment on local servers or edge devices.</p>
+                </button>
+                <button
+                  onClick={() => updateConfig('deploymentType', 'hybrid')}
+                  className={`p-8 rounded-[32px] border text-left flex flex-col items-start transition-all duration-500 glass-card sm:col-span-2 ${config.deploymentType === 'hybrid'
+                    ? 'border-emerald-500/50 bg-emerald-500/10 active'
+                    : 'border-white/5 hover:border-white/20 hover:bg-white/5'
+                    }`}
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-6 border border-white/5">
+                    <Zap className={`w-7 h-7 ${config.deploymentType === 'hybrid' ? 'text-emerald-400' : 'text-zinc-500'}`} />
+                  </div>
+                  <h4 className="font-bold text-lg text-white mb-2 text-premium">Hybrid Deployment</h4>
+                  <p className="text-sm text-zinc-500 leading-relaxed">Deploy both Cloud API endpoints AND an offline package. Maximum flexibility for any environment.</p>
                 </button>
               </div>
             </div>

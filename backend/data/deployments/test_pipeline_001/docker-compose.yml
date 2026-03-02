@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    environment:
+    - PIPELINE_ID=test_pipeline_001
+    ports:
+    - 8000:8000
+    volumes:
+    - ./data:/app/data
+version: '3.8'
