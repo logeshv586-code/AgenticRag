@@ -1,51 +1,51 @@
 import React, { useState } from 'react';
-import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers, Shield, Eye, Zap, Languages, Mic, BookOpen, Key } from 'lucide-react';
+import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers, Shield, Eye, Zap, Languages, Mic, BookOpen, Key, Search, MessageCircle, Workflow, Brain, Cpu, Users, Book, Wand2, Cloud, HardDrive, Network } from 'lucide-react';
 import RagVisualizer from './RagVisualizer';
 
 const DB_TYPES = [
-  { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.' },
-  { id: 'local', name: 'Local Vector DB', desc: 'Self-hosted, private databases.' },
-  { id: 'hybrid', name: 'Hybrid DB', desc: 'Combine both cloud and local storage.' },
+  { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.', icon: Cloud },
+  { id: 'local', name: 'Local Vector DB', desc: 'Self-hosted, private databases.', icon: HardDrive },
+  { id: 'hybrid', name: 'Hybrid DB', desc: 'Combine both cloud and local storage.', icon: Network },
 ];
 
 const CLOUD_DBS = [
-  { id: 'pinecone', name: 'Pinecone', desc: 'Managed, scalable. Best for large-scale datasets.' },
-  { id: 'weaviate', name: 'Weaviate', desc: 'Flexible, open-source. Trusted for government and secure data.' },
-  { id: 'milvus', name: 'Milvus', desc: 'Cloud-native, distributed. Optimized for enterprise AI workloads.' },
-  { id: 'qdrant', name: 'Qdrant', desc: 'High-performance vector search. Great for filtering and hybrid queries.' },
-  { id: 'elasticsearch', name: 'Elasticsearch', desc: 'Full-text + vector search. Ideal for enterprise with existing ES infrastructure.' }
+  { id: 'pinecone', name: 'Pinecone', desc: 'Managed, scalable. Best for large-scale datasets.', icon: Server },
+  { id: 'weaviate', name: 'Weaviate', desc: 'Flexible, open-source. Trusted for government and secure data.', icon: Database },
+  { id: 'milvus', name: 'Milvus', desc: 'Cloud-native, distributed. Optimized for enterprise AI workloads.', icon: Layers },
+  { id: 'qdrant', name: 'Qdrant', desc: 'High-performance vector search. Great for filtering and hybrid queries.', icon: Zap },
+  { id: 'elasticsearch', name: 'Elasticsearch', desc: 'Full-text + vector search. Ideal for enterprise with existing ES infrastructure.', icon: Search }
 ];
 
 const LOCAL_DBS = [
-  { id: 'chroma', name: 'ChromaDB' },
-  { id: 'faiss', name: 'FAISS' }
+  { id: 'chroma', name: 'ChromaDB', icon: Database },
+  { id: 'faiss', name: 'FAISS', icon: Server }
 ];
 
 const RAG_TYPES = [
-  { id: 'basic', name: 'Standard RAG', desc: 'Standard vector similarity search. Best for simple text Q&A.' },
-  { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history for assistants.' },
-  { id: 'multimodal', name: 'Multi-RAG (Multimodal)', desc: 'Handles text, images, and audio seamlessly.' },
-  { id: 'structured', name: 'Graph RAG', desc: 'Deep relationship mapping and reasoning from knowledge graphs.' },
-  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic to take actions.' },
-  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds instantly.' },
-  { id: 'personalized', name: 'Personalized RAG', desc: 'Adapts to user-specific memory and preferences.' },
-  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across multiple languages.' },
-  { id: 'voice', name: 'Voice-Ready RAG', desc: 'Speech-to-text input and spoken output.' },
-  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources and evidence for answers.' },
+  { id: 'basic', name: 'Standard RAG', desc: 'Standard vector similarity search. Best for simple text Q&A.', icon: Search },
+  { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history for assistants.', icon: MessageCircle },
+  { id: 'multimodal', name: 'Multi-RAG (Multimodal)', desc: 'Handles text, images, and audio seamlessly.', icon: Layers },
+  { id: 'structured', name: 'Graph RAG', desc: 'Deep relationship mapping and reasoning from knowledge graphs.', icon: Workflow },
+  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic to take actions.', icon: Brain },
+  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds instantly.', icon: Cpu },
+  { id: 'personalized', name: 'Personalized RAG', desc: 'Adapts to user-specific memory and preferences.', icon: Users },
+  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across multiple languages.', icon: Languages },
+  { id: 'voice', name: 'Voice-Ready RAG', desc: 'Speech-to-text input and spoken output.', icon: Mic },
+  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources and evidence for answers.', icon: Book },
 ];
 
 const LLM_MODELS = [
-  { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private. No API key needed.', provider: 'local', setup: 'Requires ~10GB VRAM. Model auto-loaded from local GGUF file.' },
-  { id: 'mistral-local', name: 'Local Mistral 7B', desc: 'Offline, fast inference.', provider: 'local', setup: 'Requires ~6GB VRAM. Download GGUF from HuggingFace.' },
-  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.', provider: 'openai', setup: 'Requires OpenAI API key.' },
-  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.', provider: 'anthropic', setup: 'Requires Anthropic API key.' },
-  { id: 'gemini', name: 'Google Gemini Pro', desc: 'Cloud, multimodal ready.', provider: 'gemini', setup: 'Requires Google AI API key.' }
+  { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private. No API key needed.', provider: 'local', setup: 'Requires ~10GB VRAM. Model auto-loaded from local GGUF file.', icon: Server },
+  { id: 'mistral-local', name: 'Local Mistral 7B', desc: 'Offline, fast inference.', provider: 'local', setup: 'Requires ~6GB VRAM. Download GGUF from HuggingFace.', icon: Terminal },
+  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.', provider: 'openai', setup: 'Requires OpenAI API key.', icon: Globe },
+  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.', provider: 'anthropic', setup: 'Requires Anthropic API key.', icon: Globe },
+  { id: 'gemini', name: 'Google Gemini Pro', desc: 'Cloud, multimodal ready.', provider: 'gemini', setup: 'Requires Google AI API key.', icon: Globe }
 ];
 
 const EMBEDDING_MODELS = [
-  { id: 'bge-local', name: 'Local BGE-m3', desc: 'Offline, dense embeddings. No key needed.', provider: 'local' },
-  { id: 'openai-ada', name: 'OpenAI text-embedding-ada-002', desc: 'Cloud standard.', provider: 'openai' },
-  { id: 'mistral-embed', name: 'Mistral Embeddings', desc: 'Cloud, multilingual.', provider: 'mistral' },
+  { id: 'bge-local', name: 'Local BGE-m3', desc: 'Offline, dense embeddings. No key needed.', provider: 'local', icon: Server },
+  { id: 'openai-ada', name: 'OpenAI text-embedding-ada-002', desc: 'Cloud standard.', provider: 'openai', icon: Globe },
+  { id: 'mistral-embed', name: 'Mistral Embeddings', desc: 'Cloud, multilingual.', provider: 'mistral', icon: Globe },
 ];
 
 const FEATURES = [
@@ -385,9 +385,12 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                       }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className={`font-bold text-sm text-premium ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
-                        {type.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {type.icon && <type.icon className={`w-4 h-4 ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-400'}`} />}
+                        <span className={`font-bold text-sm text-premium ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
+                          {type.name}
+                        </span>
+                      </div>
                       {config.dbType === type.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                     </div>
                     <p className="text-xs text-zinc-500 leading-relaxed">{type.desc}</p>
@@ -409,7 +412,10 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                             }`}
                         >
                           <div className="flex justify-between items-center mb-1">
-                            <span className="text-sm font-bold text-white">{db.name}</span>
+                            <div className="flex items-center gap-2">
+                              {db.icon && <db.icon className={`w-4 h-4 ${config.cloudDb === db.id ? 'text-cyan-400' : 'text-zinc-400'}`} />}
+                              <span className="text-sm font-bold text-white">{db.name}</span>
+                            </div>
                             {config.cloudDb === db.id && <Check className="w-4 h-4 text-cyan-400" />}
                           </div>
                           <p className="text-xs text-zinc-500">{db.desc}</p>
@@ -430,7 +436,10 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                           className={`p-3 rounded-lg border text-center transition ${config.localDb === db.id ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-900/30 border-zinc-800 text-zinc-400 hover:text-white'
                             }`}
                         >
-                          <span className="text-sm">{db.name}</span>
+                          <span className="text-sm flex items-center justify-center gap-2">
+                            {db.icon && <db.icon className="w-4 h-4 opacity-70" />}
+                            {db.name}
+                          </span>
                         </button>
                       ))}
                     </div>
@@ -458,9 +467,12 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                       }`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className={`font-bold text-sm text-premium ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
-                        {type.name}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {type.icon && <type.icon className={`w-4 h-4 ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-400 group-hover:text-cyan-300'}`} />}
+                        <span className={`font-bold text-sm text-premium ${config.ragType === type.id ? 'text-cyan-400' : 'text-zinc-200 group-hover:text-white'}`}>
+                          {type.name}
+                        </span>
+                      </div>
                       {config.ragType === type.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                     </div>
                     <p className="text-xs text-zinc-500 leading-relaxed">{type.desc}</p>
@@ -648,7 +660,10 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         }`}
                     >
                       <div className="flex justify-between items-center mb-1">
-                        <span className={`text-sm font-bold ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        <div className="flex items-center gap-2">
+                          {m.icon && <m.icon className={`w-4 h-4 ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-400 group-hover:text-cyan-300'}`} />}
+                          <span className={`text-sm font-bold ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        </div>
                         {config.llmModel === m.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                       </div>
                       <p className="text-xs leading-relaxed">{m.desc}</p>
@@ -689,7 +704,10 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         }`}
                     >
                       <div className="flex justify-between items-center mb-1">
-                        <span className={`text-sm font-medium ${config.embeddingModel === m.id ? 'text-purple-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        <div className="flex items-center gap-2">
+                          {m.icon && <m.icon className={`w-4 h-4 ${config.embeddingModel === m.id ? 'text-purple-400' : 'text-zinc-400'}`} />}
+                          <span className={`text-sm font-medium ${config.embeddingModel === m.id ? 'text-purple-400' : 'text-zinc-200'}`}>{m.name}</span>
+                        </div>
                         {config.embeddingModel === m.id && <Check className="w-4 h-4 text-purple-400" />}
                       </div>
                       <p className="text-xs">{m.desc}</p>

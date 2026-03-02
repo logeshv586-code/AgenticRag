@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
@@ -27,7 +27,76 @@ function App() {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Drag state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isPosInitialized, setIsPosInitialized] = useState(false);
+  const [hasMoved, setHasMoved] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const padding = 20;
+      // Start in bottom right, but far enough left to fit the wide text bubble (~200px)
+      setPosition({ x: window.innerWidth - 260, y: window.innerHeight - 160 });
+      setIsPosInitialized(true);
+
+      const handleResize = () => {
+        setPosition(prev => {
+          const padding = 20;
+          const elWidth = 80 + padding; // Snug around the 60px robot
+          const elHeight = 80 + padding;
+          return {
+            x: Math.max(padding, Math.min(prev.x, window.innerWidth - elWidth)),
+            y: Math.max(padding, Math.min(prev.y, window.innerHeight - elHeight))
+          };
+        });
+      };
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
+  }, []);
+
+  const handleDragStart = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    setHasMoved(false);
+    setIsDragging(true);
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: position.x,
+      initialY: position.y
+    };
+
+    const onMove = (moveEvent) => {
+      if (Math.abs(moveEvent.clientX - dragRef.current.startX) > 3 || Math.abs(moveEvent.clientY - dragRef.current.startY) > 3) {
+        setHasMoved(true);
+      }
+      let newX = dragRef.current.initialX + (moveEvent.clientX - dragRef.current.startX);
+      let newY = dragRef.current.initialY + (moveEvent.clientY - dragRef.current.startY);
+      const padding = 20;
+      const elementWidth = 80 + padding;
+      const elementHeight = 80 + padding;
+      newX = Math.max(padding, Math.min(newX, window.innerWidth - elementWidth));
+      newY = Math.max(padding, Math.min(newY, window.innerHeight - elementHeight));
+      setPosition({ x: newX, y: newY });
+    };
+
+    const onUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
   const messagesEndRef = useRef(null);
+  const terminalRef = useRef(null);
   const recognitionRef = useRef(null);
   const [isListening, setIsListening] = useState(false);
   const mediaRecorderRef = useRef(null);
@@ -36,19 +105,78 @@ function App() {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [initialCreateConfig, setInitialCreateConfig] = useState(null);
+  const [activeTheme, setActiveTheme] = useState('cyan');
   const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [metrics, setMetrics] = useState(null);
   const [logs, setLogs] = useState([]);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const themes = {
+      cyan: { accent: '#00d2ff', bg: '#020508', orb: '#00d2ff', image: 'var(--bg-cyan-tint)' },
+      emerald: { accent: '#10b981', bg: '#010805', orb: '#10b981', image: 'var(--bg-emerald-tint)' },
+      purple: { accent: '#7c3aed', bg: '#050208', orb: '#7c3aed', image: 'var(--bg-purple-tint)' },
+      rose: { accent: '#f43f5e', bg: '#080204', orb: '#f43f5e', image: 'var(--bg-rose-tint)' }
+    };
+
+    const theme = themes[activeTheme] || themes.cyan;
+    root.style.setProperty('--current-accent', theme.accent);
+    root.style.setProperty('--orb-color', theme.orb);
+    root.style.setProperty('--bg-void-image', theme.image);
+    document.body.style.backgroundColor = theme.bg;
+  }, [activeTheme]);
+
+  // Mouse move effect for glass panels
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      document.querySelectorAll('.glass-panel').forEach(panel => {
+        const rect = panel.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+        panel.style.setProperty('--mouse-x', `${x}%`);
+        panel.style.setProperty('--mouse-y', `${y}%`);
+      });
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
+  // Terminal state
+  const terminalLines = [
+    "> [SYSTEM] Initializing Agentic Node #402",
+    "> [AUTH] Token validated (PRIME_SOURCE_ENT)",
+    "> [THINK] Browsing vector store...",
+    "> [ACTION] Executing tool: SQLRunner",
+    "> [SYSTEM] Retrieved 4 rows",
+    "> [THINK] Synthesizing reasoning...",
+    "> [OUTPUT] Generation complete."
+  ];
+  const [termIdx, setTermIdx] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTermIdx(prev => (prev >= terminalLines.length - 1 ? 0 : prev + 1));
+    }, 1200);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+    }
+  }, [termIdx]);
 
   const ragTypes = [
     { key: 'basic_rag', title: 'Standard RAG', icon: Search, short: 'Neural vector search for precise text retrieval and answering.', works: ['Chunk text precisely', 'Neural embeddings', 'Top-K retrieval', 'Contextual generation'], canDo: ['FAQs', 'Knowledge Bases'], query: 'How does Standard RAG work?' },
     { key: 'hybrid_rag', title: 'Hybrid RAG', icon: Wand2, short: 'Combines keyword & vector search for maximum recall.', works: ['BM25 + Dense vector', 'Reciprocal Rank Fusion', 'Semantic re-ranking'], canDo: ['Documentation', 'Code Search'], query: 'Why use Hybrid RAG?' },
     { key: 'conversational_rag', title: 'Conversational RAG', icon: MessageCircle, short: 'Maintains long-term context and chat history.', works: ['Session persistence', 'Context compression', 'Memory management'], canDo: ['Customer Support', 'AI Tutors'], query: 'Explain Conversational RAG memory.' },
     { key: 'multimodal_rag', title: 'Multi-RAG', icon: Layers, short: 'Seamlessly retrieve images, audio, and video.', works: ['Cross-modal embedding', 'Multi-vector indexing'], canDo: ['Media Search', 'Product Catalogs'], query: 'Show Multi-RAG capabilities.' },
-    { key: 'structured_rag', title: 'Graph RAG', icon: Workflow, short: 'Deep reasoning across knowledge graphs and relationships.', works: ['Entity extraction', 'Relationship mapping', 'Graph traversal'], canDo: ['Legal Discovery', 'Medical Research'], query: 'Why use Graph RAG for reasoning?' },
+    { key: 'structured_rag', title: 'Structured RAG', icon: Database, short: 'Query SQL and structured data sources alongside text.', works: ['Text-to-SQL', 'Table parsing'], canDo: ['Data Analysis', 'Financial Reports'], query: 'How does Structured RAG work?' },
+    { key: 'graph_rag', title: 'Graph RAG', icon: Workflow, short: 'Deep reasoning across knowledge graphs and relationships.', works: ['Entity extraction', 'Relationship mapping', 'Graph traversal'], canDo: ['Legal Discovery', 'Medical Research'], query: 'Why use Graph RAG for reasoning?' },
     { key: 'agentic_rag', title: 'Agentic RAG', icon: Brain, short: 'Reasoning agents that plan and use tools.', works: ['Multi-step planning', 'Tool execution', 'Self-correction'], canDo: ['Data Analysis', 'Web Research'], query: 'Show Agentic RAG in action.' },
-    { key: 'agentic_rag', title: 'Agentic RAG', icon: Brain, short: 'Plan actions and call tools with retrieval.', works: ['Planner + tools', 'Iterative retrieval'], canDo: ['Research', 'Automation'], query: 'What is agentic RAG?' },
     { key: 'realtime_rag', title: 'Real‑time RAG', icon: Cpu, short: 'Ingest new data and answer on fresh content.', works: ['Streaming ingestion', 'Ephemeral cache'], canDo: ['News', 'Ops alerts'], query: 'How to keep RAG real‑time?' },
     { key: 'personalized_rag', title: 'Personalized RAG', icon: Users, short: 'Use user profile and preferences in retrieval.', works: ['User context features', 'Scoped indexing'], canDo: ['Portals', 'Learning'], query: 'How to personalize RAG?' },
     { key: 'xl_rag', title: 'Cross‑lingual RAG', icon: Languages, short: 'Retrieve and answer across languages.', works: ['Multilingual embeddings', 'Optional translation'], canDo: ['Global sites', 'Support'], query: 'How to make RAG multilingual?' },
@@ -271,117 +399,335 @@ function App() {
     }
   };
 
+  const chipData = [
+    { icon: <Search className="w-3 h-3 text-cyan-400" />, label: 'Standard RAG' },
+    { icon: <Wand2 className="w-3 h-3 text-[#a78bfa]" />, label: 'Hybrid RAG' },
+    { icon: <MessageCircle className="w-3 h-3 text-[#22c55e]" />, label: 'Conversational' },
+    { icon: <Layers className="w-3 h-3 text-[#f97316]" />, label: 'Multi-RAG' },
+    { icon: <Workflow className="w-3 h-3 text-[#38bdf8]" />, label: 'Graph RAG' },
+    { icon: <Brain className="w-3 h-3 text-[#fde047]" />, label: 'Agentic' },
+    { icon: <Cpu className="w-3 h-3 text-[#60a5fa]" />, label: 'Real-time' },
+    { icon: <Users className="w-3 h-3 text-[#34d399]" />, label: 'Personalized' },
+    { icon: <Languages className="w-3 h-3 text-[#f43f5e]" />, label: 'Cross-lingual' },
+    { icon: <Mic className="w-3 h-3 text-[#00b4d8]" />, label: 'Voice RAG' },
+    { icon: <Book className="w-3 h-3 text-[#eab308]" />, label: 'Citation RAG' },
+    { icon: <Shield className="w-3 h-3 text-[#64748b]" />, label: 'Guardrailed' },
+    { icon: <Briefcase className="w-3 h-3 text-[#22c55e]" />, label: 'HR Assistant' },
+    { icon: <Book className="w-3 h-3 text-[#fbbf24]" />, label: 'Document Q&A' },
+  ];
+  const chips = [...chipData, ...chipData];
+
   return (
-    <div className="relative min-h-screen bg-zinc-950 font-sans text-zinc-100 selection:bg-cyan-500/30">
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <FloatingLines
-          linesGradient={['#22d3ee', '#00B2FF', '#3b82f6']}
-          enabledWaves={['top', 'middle', 'bottom']}
-          lineCount={[6, 6, 6]}
-          lineDistance={[5, 5, 5]}
-          animationSpeed={1}
-          interactive={true}
-          bendRadius={120}
-          bendStrength={-30}
-          mouseDamping={0.08}
-          parallax={true}
-          parallaxStrength={0.2}
-          mixBlendMode="screen"
-        />
+    <div className="relative min-h-screen bg-[#020508] font-sans text-zinc-100 selection:bg-cyan-500/30 page-wrap">
+      <div className="aurora-container pointer-events-none">
+        <div className="aurora-orb orb-1" id="orb1"></div>
+        <div className="aurora-orb orb-2"></div>
       </div>
-      <div className="relative z-10 overflow-x-hidden">
-        <div className="px-8 pt-20 pb-10 max-w-7xl mx-auto">
-          <div className="flex items-center justify-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl shadow-cyan-500/10 animate-float-more">
-              <Bot className="w-10 h-10 text-[#22d3ee]" />
+
+      <nav className="fixed top-8 left-0 right-0 z-50 flex justify-center px-4">
+        <div className="nav-pill flex items-center justify-between w-full max-w-lg lg:max-w-none lg:w-auto gap-4 lg:gap-12 animate-fade-in-up">
+          <div className="flex items-center gap-3 font-['Syne'] font-bold text-xl tracking-tighter">
+            <span className="text-cyan-400">⚡</span> AI.OS
+          </div>
+
+          {/* Burger Menu for Mobile */}
+          <button
+            className="lg:hidden p-2 text-zinc-400 hover:text-white transition"
+            onClick={() => setIsMobileMenuOpen(true)}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+
+          <div className="hidden lg:flex items-center gap-8 text-xs font-bold tracking-widest uppercase text-zinc-500">
+            <a href="#" className="hover:text-white transition">Platform</a>
+            <a href="#glass-modules" className="hover:text-white transition">Architectures</a>
+            <a href="#" className="hover:text-white transition cursor-pointer" onClick={loadDashboardData}>Observability</a>
+          </div>
+          <button className="hidden sm:block bg-white text-black px-6 py-2.5 rounded-full text-xs font-bold hover:scale-110 active:scale-95 transition shadow-2xl" onClick={() => { setInitialCreateConfig(null); setIsCreateModalOpen(true); }}>
+            START BUILDING
+          </button>
+        </div>
+      </nav>
+
+      {/* Mobile Menu Drawer */}
+      <div className={`fixed inset-0 z-[100] transition-all duration-500 ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsMobileMenuOpen(false)}></div>
+        <div className={`absolute right-0 top-0 bottom-0 w-64 glass-panel border-l border-white/10 p-8 flex flex-col gap-8 transition-transform duration-500 ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="flex justify-between items-center">
+            <div className="font-['Syne'] font-bold text-xl tracking-tighter">AI.OS</div>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-400 hover:text-white">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="flex flex-col gap-6 text-sm font-bold tracking-widest uppercase text-zinc-500">
+            <a href="#" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Platform</a>
+            <a href="#glass-modules" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Architectures</a>
+            <a href="#" className="hover:text-white transition cursor-pointer" onClick={() => { setIsMobileMenuOpen(false); loadDashboardData(); }}>Observability</a>
+          </div>
+          <button className="mt-auto bg-white text-black px-6 py-4 rounded-full text-xs font-bold hover:scale-105 active:scale-95 transition" onClick={() => { setIsMobileMenuOpen(false); setInitialCreateConfig(null); setIsCreateModalOpen(true); }}>
+            START BUILDING
+          </button>
+        </div>
+      </div>
+
+      <main className="pt-48 px-6 max-w-7xl mx-auto relative z-10 flex-1 w-full pb-20">
+
+        {/* V2 Hero */}
+        <header className="text-center mb-40 animate-fade-in-up">
+          <h1 className="font-['Syne'] text-6xl md:text-9xl font-extrabold leading-[0.9] tracking-tighter mb-10">
+            Neural <span className="shimmer-text">Architectures</span><br />For Global Data
+          </h1>
+          <p className="text-zinc-500 text-lg md:text-2xl max-w-3xl mx-auto font-light leading-relaxed mb-12">
+            Unified RAG infrastructure for enterprise intelligence.
+            Move from data silos to a cohesive glass knowledge base.
+          </p>
+          <div className="flex flex-wrap justify-center gap-6 mb-16">
+            <button className="px-10 py-5 bg-cyan-500 text-black rounded-full font-bold shadow-[0_0_30px_rgba(0,210,255,0.4)] hover:scale-105 transition" onClick={() => { setInitialCreateConfig(null); setIsCreateModalOpen(true); }}>
+              Deploy Assistant
+            </button>
+            <button className="px-10 py-5 glass-panel rounded-full font-bold flex items-center gap-3">
+              <Play className="w-5 h-5" />
+              Watch Ecosystem Overview
+            </button>
+          </div>
+
+          <div className="ent-type-scroll-wrap">
+            <div className="ent-type-scroll-track">
+              {chips.map((c, i) => (
+                <div key={i} className="ent-type-chip">
+                  <span className="ent-chip-icon flex items-center justify-center mr-1">{c.icon}</span>{c.label}
+                </div>
+              ))}
             </div>
           </div>
-          <h1 className="text-center text-5xl md:text-6xl font-bold mb-6 text-white tracking-tight">
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#22d3ee] via-cyan-400 to-blue-500">Deploy AI Experiences</span> With Enterprise Design
-          </h1>
-          <p className="text-center text-lg md:text-xl text-zinc-400 max-w-3xl mx-auto leading-relaxed">
-            Build branded AI assistants and RAG-powered pages in minutes. No code. Secure by design. Tailored to Prime Source Global content.
-          </p>
-          <div className="flex justify-center mt-8">
-            <button
-              onClick={() => { setInitialCreateConfig(null); setIsCreateModalOpen(true); }}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 text-white font-bold shadow-lg shadow-cyan-500/20 hover:scale-105 transition active:scale-95"
-            >
-              <Wand2 className="w-5 h-5" />
-              Build Custom RAG
-            </button>
-            <button
-              onClick={loadDashboardData}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-zinc-900 border border-zinc-700 text-white font-bold hover:bg-zinc-800 ml-4 transition active:scale-95"
-            >
-              <Database className="w-5 h-5 text-cyan-400" />
-              Observability Dashboard
-            </button>
-          </div>
-        </div>
-        <div className="px-8 max-w-7xl mx-auto mt-6">
-          <GlassIcons onSelect={(it) => {
-            const byTitle = (arr, t) => arr.find(x => x.title === t);
-            const map = {
-              'Basic RAG': 'Basic RAG',
-              'Hybrid RAG': 'Hybrid RAG',
-              'Conversational': 'Conversational RAG',
-              'Multimodal': 'Multimodal RAG',
-              'Structured': 'Structured RAG',
-              'Graph': 'Knowledge Graph RAG',
-              'Agentic': 'Agentic RAG',
-              'Realtime': 'Real‑time RAG',
-              'Personalized': 'Personalized RAG',
-              'Cross‑lingual': 'Cross‑lingual RAG',
-              'Voice': 'Voice RAG',
-              'Citations': 'Citation RAG',
-              'Guardrails': 'Guardrailed RAG',
-              'Sales': 'Sales Assistant',
-              'HR': 'HR Assistant',
-            };
-            const keyTitle = map[it.label];
-            let item = byTitle(ragTypes, keyTitle);
-            let type = 'rag';
-            if (!item) {
-              item = byTitle(assistantTypes, keyTitle);
-              type = 'assistant';
-            }
-            if (item) {
-              openModal(type, item);
-            }
-          }} />
-        </div>
+        </header>
 
-        <div id="solutions" className="px-8 py-8 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl md:text-3xl font-bold">RAG Types</h2>
-            <span className="text-sm text-zinc-400">Tap a card to learn more</span>
+        {/* Advanced Feature: Architecture Flow */}
+        <section className="mb-40 animate-fade-in-up animation-delay-200">
+          <div className="glass-panel rounded-[40px] p-12 flex flex-col md:flex-row items-center gap-12">
+            <div className="md:w-1/3 text-left">
+              <div className="text-cyan-400 font-bold text-xs uppercase tracking-widest mb-4">Core Pipeline</div>
+              <h2 className="font-['Syne'] text-4xl font-bold mb-6 text-white">Real-time Retrieval Flow</h2>
+              <p className="text-zinc-500 text-sm leading-relaxed mb-8">
+                Our hybrid engine concurrently queries vector stores and relational databases,
+                merging results through a cross-attention reranker before generation.
+              </p>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-sm font-medium">
+                  <Check className="w-5 h-5 text-emerald-500" />
+                  Latency: &lt; 42ms per hop
+                </div>
+                <div className="flex items-center gap-3 text-sm font-medium">
+                  <Check className="w-5 h-5 text-emerald-500" />
+                  Context Window: 128k Tokens
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 w-full bg-black/20 rounded-3xl p-8 border border-white/5 relative overflow-hidden hidden md:block">
+              <svg viewBox="0 0 600 300" className="w-full h-full">
+                <path d="M50,150 L150,150 M250,150 L350,150 M450,150 L550,150" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2" className="pipeline-path" />
+
+                <g className="node">
+                  <circle cx="50" cy="150" r="40" fill="rgba(0, 210, 255, 0.1)" stroke="var(--accent-cyan)" strokeWidth="2" />
+                  <foreignObject x="30" y="130" width="40" height="40">
+                    <Database className="w-10 h-10 text-cyan-400" />
+                  </foreignObject>
+                  <text x="50" y="215" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">SOURCE</text>
+                </g>
+
+                <g className="node">
+                  <circle cx="200" cy="150" r="45" fill="rgba(124, 58, 237, 0.1)" stroke="var(--accent-purple)" strokeWidth="2" />
+                  <foreignObject x="175" y="125" width="50" height="50">
+                    <Search className="w-12 h-12 text-purple-400" />
+                  </foreignObject>
+                  <text x="200" y="220" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">RETRIEVAL</text>
+                </g>
+
+                <g className="node">
+                  <circle cx="400" cy="150" r="45" fill="rgba(16, 185, 129, 0.1)" stroke="var(--accent-emerald)" strokeWidth="2" />
+                  <foreignObject x="375" y="125" width="50" height="50">
+                    <Layers className="w-12 h-12 text-emerald-400" />
+                  </foreignObject>
+                  <text x="400" y="220" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">RANKER</text>
+                </g>
+
+                <g className="node">
+                  <circle cx="550" cy="150" r="40" fill="rgba(255, 255, 255, 0.1)" stroke="rgba(255,255,255,0.8)" strokeWidth="2" />
+                  <foreignObject x="532" y="132" width="36" height="36">
+                    <Check className="w-9 h-9 text-white" />
+                  </foreignObject>
+                  <text x="550" y="215" textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">RESULT</text>
+                </g>
+
+                <circle cx="50" cy="150" r="4" fill="var(--accent-cyan)" className="data-packet">
+                  <animate attributeName="cx" from="50" to="550" dur="4s" repeatCount="indefinite" />
+                </circle>
+              </svg>
+            </div>
+          </div>
+        </section>
+
+        {/* Upgraded Bento Modules */}
+        <section className="mb-40 animate-fade-in-up animation-delay-300">
+          <div className="bento-grid">
+
+            <div className={`glass-panel rounded-[32px] p-8 bento-main flex flex-col justify-between overflow-hidden transition-all duration-700 ${activeTheme === 'cyan' ? 'ring-2 ring-cyan-500/50' : ''}`}
+              onClick={() => setActiveTheme('cyan')}>
+              <div className="flex justify-between items-start">
+                <div className="w-16 h-16 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Cpu className="w-8 h-8" />
+                </div>
+                <div className="px-3 py-1 bg-cyan-500/20 rounded-full text-[10px] font-bold text-cyan-400 uppercase">Live Processing</div>
+              </div>
+
+              <div className="mt-8 h-48 bg-black/40 rounded-xl p-4 border border-white/5 overflow-hidden relative">
+                <div ref={terminalRef} className="terminal-text text-[11px] font-mono leading-relaxed h-full overflow-y-auto scrollbar-none" id="terminal-logs">
+                  {terminalLines.slice(0, termIdx + 1).map((line, i) => (
+                    <div key={i} className="text-zinc-300 animate-in fade-in slide-in-from-left-2 duration-300">
+                      {line}
+                    </div>
+                  ))}
+                  <div className="animate-pulse text-cyan-400 mt-1">_</div>
+                </div>
+              </div>
+
+              <div className="mt-6 text-left">
+                <h3 className="text-2xl font-bold text-white mb-2">Agentic Reasoning</h3>
+                <p className="text-zinc-500 text-sm">Autonomous agents that iterate on complex queries until a high-confidence answer is found.</p>
+              </div>
+            </div>
+
+            <div className={`glass-panel rounded-[32px] p-8 flex flex-col justify-between transition-all duration-700 ${activeTheme === 'emerald' ? 'ring-2 ring-emerald-500/50' : ''}`}
+              onClick={() => setActiveTheme('emerald')}>
+              <Shield className="w-10 h-10 text-emerald-400" />
+              <div className="text-left mt-4">
+                <h3 className="text-xl font-bold text-white mb-2">Policy Guard</h3>
+                <p className="text-zinc-500 text-xs">PII Redaction & Topic Compliance.</p>
+              </div>
+            </div>
+
+            <div className={`glass-panel rounded-[32px] p-8 flex flex-col justify-between transition-all duration-700 ${activeTheme === 'purple' ? 'ring-2 ring-purple-500/50' : ''}`}
+              onClick={() => setActiveTheme('purple')}>
+              <Layers className="w-10 h-10 text-purple-400" />
+              <div className="text-left mt-4">
+                <h3 className="text-xl font-bold text-white mb-2">Multi-RAG</h3>
+                <p className="text-zinc-500 text-xs">Image, Video, & PDF Retrieval.</p>
+              </div>
+            </div>
+
+            <div className={`glass-panel rounded-[32px] p-8 bento-wide flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all duration-700 ${activeTheme === 'rose' ? 'ring-2 ring-rose-500/50' : ''}`}
+              onClick={() => setActiveTheme('rose')}>
+              <div className="flex gap-6 items-center text-left">
+                <div className="w-14 h-14 rounded-full bg-zinc-800 flex items-center justify-center text-white shrink-0">
+                  <Globe className="w-6 h-6 text-rose-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Cross-Lingual Engine</h3>
+                  <p className="text-zinc-500 text-xs">Translate and answer in 94+ languages natively.</p>
+                </div>
+              </div>
+              <div className="flex -space-x-3">
+                <div className="w-10 h-10 rounded-full bg-zinc-700 border-2 border-zinc-900 flex items-center justify-center font-bold text-xs">EN</div>
+                <div className="w-10 h-10 rounded-full bg-zinc-600 border-2 border-zinc-900 flex items-center justify-center font-bold text-xs">ES</div>
+                <div className="w-10 h-10 rounded-full bg-zinc-500 border-2 border-zinc-900 flex items-center justify-center font-bold text-xs pb-1">...</div>
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <section className="ent-section" id="glass-modules" style={{ paddingBottom: '20px' }}>
+          <div className="ent-section-header-row animate-fade-in-up">
+            <div>
+              <div className="ent-section-label">Platform Modules</div>
+              <h2 className="ent-section-title">Interactive AI Capabilities</h2>
+              <p className="ent-section-desc">Explore our highly specialized RAG modules and assistant templates below.</p>
+            </div>
+          </div>
+          <div className="w-full relative z-10 animate-fade-in-up animation-delay-300">
+            <GlassIcons onSelect={(it) => {
+              const byTitle = (arr, t) => arr.find(x => x.title === t);
+              const map = {
+                'Basic RAG': 'Standard RAG',
+                'Hybrid RAG': 'Hybrid RAG',
+                'Conversational': 'Conversational RAG',
+                'Multimodal': 'Multi-RAG',
+                'Structured': 'Structured RAG',
+                'Graph': 'Graph RAG',
+                'Agentic': 'Agentic RAG',
+                'Realtime': 'Real‑time RAG',
+                'Personalized': 'Personalized RAG',
+                'Cross‑lingual': 'Cross‑lingual RAG',
+                'Voice': 'Voice RAG',
+                'Citations': 'Citation RAG',
+                'Guardrails': 'Guardrailed RAG',
+                'Sales': 'Sales Assistant',
+                'HR': 'HR Assistant',
+              };
+              const keyTitle = map[it.label];
+              let item = byTitle(ragTypes, keyTitle);
+              let type = 'rag';
+              if (!item) {
+                item = byTitle(assistantTypes, keyTitle);
+                type = 'assistant';
+              }
+              if (item) {
+                openModal(type, item);
+              }
+            }} />
+          </div>
+        </section>
+
+        <section className="ent-section" id="rag-types">
+          <div className="ent-section-header-row animate-fade-in-up">
+            <div>
+              <div className="ent-section-label">RAG Types</div>
+              <h2 className="ent-section-title">Choose Your Architecture</h2>
+              <p className="ent-section-desc">Thirteen specialized retrieval patterns, each optimized for a different use case and data type.</p>
+            </div>
+            <button className="ent-btn-ghost hidden md:inline-flex">Tap a card to learn more →</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
             {ragTypes.map((r) => {
               const Icon = r.icon;
               return (
-                <button key={r.key} onClick={() => openModal('rag', r)} className="text-left relative rounded-[28px] p-6 transition-all duration-300 glass-card group">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-xl group-hover:scale-110 transition-transform">
-                      <Icon className="w-7 h-7 text-[#22d3ee]" />
+                <button key={r.key} onClick={() => openModal('rag', r)} className={`text-left relative rounded-[28px] p-6 transition-all duration-300 glass-card group ${activeTheme === 'cyan' && r.key === 'agentic_rag' ? 'live-processing-pulse' : ''}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center backdrop-blur-xl group-hover:scale-110 transition-transform">
+                        <Icon className="w-7 h-7 text-[#22d3ee]" />
+                      </div>
+                      <div className="text-xl font-bold text-premium">{r.title}</div>
                     </div>
-                    <div className="text-xl font-bold text-premium">{r.title}</div>
+                    {(activeTheme === 'cyan' && r.key === 'agentic_rag') && (
+                      <div className="px-2 py-0.5 bg-cyan-500/20 rounded-full text-[8px] font-bold text-cyan-400 uppercase animate-pulse">Live</div>
+                    )}
                   </div>
                   <div className="text-sm text-zinc-400 leading-relaxed min-h-[48px]">{r.short}</div>
                   <div className="mt-5 flex items-center gap-2 pt-4 border-t border-white/5">
-                    <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Ready to Deploy</span>
+                    <div className={`w-2 h-2 rounded-full ${activeTheme === 'cyan' && r.key === 'agentic_rag' ? 'bg-cyan-400 animate-ping' : 'bg-cyan-500 animate-pulse'}`}></div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      {activeTheme === 'cyan' && r.key === 'agentic_rag' ? 'Processing Node' : 'Ready to Deploy'}
+                    </span>
                   </div>
                 </button>
               );
             })}
           </div>
-        </div>
-        <div className="px-8 pb-12 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl md:text-3xl font-bold">Assistant Templates</h2>
-            <span className="text-sm text-zinc-400">Ready for branding and voice</span>
+        </section>
+
+        <div className="ent-section-divider"><div className="ent-divider-line"></div></div>
+
+        <section className="ent-section" id="templates">
+          <div className="ent-section-header-row animate-fade-in-up">
+            <div>
+              <div className="ent-section-label">Assistant Templates</div>
+              <h2 className="ent-section-title">Ready in Minutes</h2>
+              <p className="ent-section-desc">Production-ready templates for every department. Fully branded. No engineering required.</p>
+            </div>
+            <button className="ent-btn-ghost hidden md:inline-flex">Ready for branding and voice →</button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {assistantTypes.map((a) => {
@@ -403,9 +749,18 @@ function App() {
               );
             })}
           </div>
-        </div>
+        </section>
 
-      </div>
+        <footer className="ent-footer">
+          <div className="ent-footer-logo">AI Platform</div>
+          <div className="ent-footer-copy">© 2026 Enterprise AI. All rights reserved.</div>
+          <div className="flex gap-6">
+            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Privacy</a>
+            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Terms</a>
+            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Contact</a>
+          </div>
+        </footer>
+      </main>
 
       {selected && (
         <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
@@ -483,61 +838,56 @@ function App() {
         </div>
       )}
 
-      <div className={`fixed bottom-6 right-6 z-50 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
-        <div className="w-[380px] h-[600px] bg-[#09090b] text-white rounded-2xl shadow-2xl flex flex-col overflow-hidden border border-zinc-800 ring-1 ring-black/5">
+      <div className={`fixed bottom-10 right-10 z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
+        <div className="w-[420px] h-[650px] glass-panel rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
-          <div className="flex items-center justify-between px-4 py-3 bg-[#09090b] border-b border-zinc-800">
-            <div className="flex items-center gap-3">
-              <div className="scale-75 origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
-                <MiniRobot />
+          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20">
+                <Bot className="w-7 h-7" />
               </div>
               <div>
-                <h3 className="text-[15px] font-semibold">Chat with AI Bot</h3>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
-                  <span className="text-[11px] text-zinc-400">Online</span>
+                <h4 className="font-bold text-white tracking-wide">Neural Assistant</h4>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Node Active</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
-                <Minus className="w-5 h-5" />
-              </button>
-              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-white transition">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white">
+              <ChevronDown className="w-6 h-6" />
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent perspective-[1000px]">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-premium">
             {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`flex ${msg.role === 'user' ? 'justify-end animate-user-message-in' : 'justify-start animate-message-in'}`}
               >
                 {msg.role === 'user' ? (
-                  <div className="bg-[#22d3ee] text-black px-4 py-2.5 rounded-2xl rounded-tr-sm max-w-[85%] text-[14px] font-medium leading-relaxed shadow-md">
+                  <div className="bg-gradient-to-br from-cyan-400 to-blue-500 text-black px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[14px] font-semibold leading-relaxed shadow-lg shadow-cyan-500/20">
                     {msg.content}
                   </div>
                 ) : (
-                  <div className="flex gap-3 max-w-[90%] animate-fade-in">
-                    <div className="w-10 h-10 flex-shrink-0 -ml-1">
-                      <div className="scale-[0.6] origin-top-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                  <div className="flex gap-4 max-w-[90%] animate-fade-in">
+                    <div className="w-10 h-10 flex-shrink-0">
+                      <div className="scale-[0.6] origin-top-left drop-shadow-lg" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
                         <MiniRobot />
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <div className="bg-[#1c1c1e] p-3 rounded-2xl rounded-tl-sm border border-zinc-800/50 text-zinc-200 text-[14px] leading-6 font-normal">
+                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-white/10 text-zinc-200 text-[14px] leading-relaxed font-normal shadow-lg">
                         {msg.content}
                       </div>
 
                       {msg.suggestions && (
-                        <div className="flex flex-col gap-2 mt-1 w-full max-w-[280px]">
+                        <div className="flex flex-col gap-2 mt-2 w-full max-w-[280px]">
                           {msg.suggestions.map(s => (
                             <button
                               key={s.id}
                               onClick={() => handleSuggestionClick(s.id)}
-                              className="px-4 py-2 text-sm text-left bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300"
+                              className="px-4 py-2.5 text-sm text-left bg-black/40 border border-white/10 rounded-xl hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300 shadow-sm"
                             >
                               {s.label}
                             </button>
@@ -545,15 +895,15 @@ function App() {
                         </div>
                       )}
 
-                      <div className="flex items-center gap-1">
-                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                          <ThumbsUp className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 mt-1 ml-1">
+                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                          <ThumbsUp className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                          <ThumbsDown className="w-3.5 h-3.5" />
+                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                          <ThumbsDown className="w-4 h-4" />
                         </button>
-                        <button className="p-1.5 rounded-full hover:bg-zinc-800 transition text-zinc-500 hover:text-white">
-                          <Copy className="w-3.5 h-3.5" />
+                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                          <Copy className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -564,13 +914,13 @@ function App() {
 
             {isLoading && (
               <div className="flex justify-start animate-message-in">
-                <div className="flex gap-3 max-w-[90%] animate-fade-in">
+                <div className="flex gap-4 max-w-[90%] animate-fade-in">
                   <div className="flex flex-col gap-2">
-                    <div className="bg-gradient-to-br from-[#121214] to-[#1a1a1f]/90 backdrop-blur-sm p-4 rounded-2xl rounded-tl-md border border-white/10 shadow-xl ring-1 ring-cyan-500/10 flex items-center gap-5">
-                      <div className="scale-75 origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                    <div className="bg-gradient-to-br from-black/60 to-black/80 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-cyan-500/20 shadow-xl shadow-cyan-500/10 flex items-center gap-5">
+                      <div className="scale-[0.6] origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
                         <WaitingRobot />
                       </div>
-                      <span className="text-zinc-300 text-sm tracking-wide animate-pulse">Request from PSG is coming...</span>
+                      <span className="text-cyan-400 font-medium text-sm tracking-wide animate-pulse">Computing Node Response...</span>
                     </div>
                   </div>
                 </div>
@@ -579,58 +929,64 @@ function App() {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 bg-[#09090b] border-t border-zinc-800">
-            <div className="flex items-center gap-2 bg-[#1c1c1e] p-1.5 pl-3 pr-1.5 rounded-[24px] border border-zinc-800/50 focus-within:border-zinc-700 transition duration-300">
-              <button className="p-1.5 hover:bg-zinc-800 rounded-full text-zinc-400 transition">
-                <LayoutGrid className="w-5 h-5" strokeWidth={1.5} />
+          <div className="p-6 bg-black/20 backdrop-blur-xl border-t border-white/5">
+
+            {isListening && (
+              <div className="w-full h-8 mb-4 flex items-center justify-center gap-1.5">
+                <div className="w-1 h-3 bg-cyan-400 animate-pulse rounded-full"></div>
+                <div className="w-1 h-6 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '100ms' }}></div>
+                <div className="w-1 h-4 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '200ms' }}></div>
+                <div className="w-1 h-8 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '300ms' }}></div>
+                <div className="w-1 h-5 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '400ms' }}></div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-[30px] border border-white/10 focus-within:border-cyan-500/50 focus-within:bg-white/10 transition-all duration-300">
+              <button
+                onClick={toggleListening}
+                className={`p-3 rounded-full transition-all flex items-center justify-center ${isListening ? 'text-cyan-400 bg-cyan-400/10 scale-110' : 'text-zinc-500 hover:text-cyan-400 hover:bg-white/5'}`}
+              >
+                <Mic className="w-5 h-5" strokeWidth={isListening ? 2 : 1.5} />
               </button>
 
               <input
                 type="text"
-                placeholder="Type message..."
-                className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px]"
+                placeholder="Describe your architecture..."
+                className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px] px-2"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               />
-              <button
-                onClick={toggleListening}
-                className={`px-3 py-2 rounded-full border ${isListening ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-zinc-700 bg-zinc-900 text-zinc-300'}`}
-              >
-                <div className="flex items-center gap-2">
-                  <Mic className="w-4 h-4" />
-                  <span className="text-sm">{isListening ? 'Listening' : 'Voice'}</span>
-                </div>
-              </button>
 
               <button
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 disabled={!inputValue.trim()}
-                className={`p-2 rounded-full transition-all duration-300 ${inputValue.trim() ? 'bg-[#22d3ee] text-black rotate-0' : 'bg-transparent text-zinc-600 rotate-90'}`}
+                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${inputValue.trim() ? 'bg-cyan-400 text-black hover:scale-105 active:scale-95 shadow-lg shadow-cyan-400/20 shrink-0' : 'bg-white/5 text-zinc-600 cursor-not-allowed shrink-0 rotate-90'}`}
               >
-                <Send className="w-4 h-4" fill={inputValue.trim() ? "currentColor" : "none"} />
+                <Send className="w-5 h-5 ml-1" />
               </button>
-            </div>
-            <div className="text-center mt-2 text-[10px] text-zinc-500">
-              AI can make mistakes.
             </div>
           </div>
         </div>
       </div>
 
-      <div
-        className={`fixed bottom-6 right-6 transition-all duration-300 z-40 ${isOpen ? 'scale-0 opacity-0 pointer-events-none' : 'scale-100 opacity-100'}`}
-        style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}
-      >
-        <Robot3D onClick={() => setIsOpen(true)} notificationCount={1} />
-      </div>
-
-      <button
-        onClick={() => setIsOpen(false)}
-        className={`fixed bottom-6 right-6 p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-105 z-40 bg-zinc-800 text-white ${isOpen ? 'scale-100 opacity-100' : 'scale-0 opacity-0 pointer-events-none'}`}
-      >
-        <X className="w-7 h-7" />
-      </button>
+      {isPosInitialized && (
+        <div
+          className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
+          style={{ left: position.x, top: position.y }}
+          onMouseDown={handleDragStart}
+          onClick={() => {
+            if (!hasMoved) setIsOpen(true);
+          }}
+        >
+          <div className="relative w-[60px] h-[60px] flex items-center justify-center overflow-visible group/bot">
+            {/* Robot Container - Small and precise */}
+            <div className="scale-[0.85] drop-shadow-[0_0_20px_rgba(0,210,255,0.3)] group-hover:scale-[0.95] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+              <Robot3D />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Observability Dashboard Modal */}
       {isDashboardOpen && (
