@@ -444,9 +444,9 @@ function App() {
           </button>
 
           <div className="hidden lg:flex items-center gap-8 text-xs font-bold tracking-widest uppercase text-zinc-500">
-            <a href="#" className="hover:text-white transition">Platform</a>
-            <a href="#glass-modules" className="hover:text-white transition">Architectures</a>
-            <a href="#" className="hover:text-white transition cursor-pointer" onClick={loadDashboardData}>Observability</a>
+            <a href="#platform" className="hover:text-white transition">Platform</a>
+            <a href="#architectures" className="hover:text-white transition">Architectures</a>
+            <a href="#observability" className="hover:text-white transition cursor-pointer">Observability</a>
           </div>
           <button className="hidden sm:block bg-white text-black px-6 py-2.5 rounded-full text-xs font-bold hover:scale-110 active:scale-95 transition shadow-2xl" onClick={() => { setInitialCreateConfig(null); setIsCreateModalOpen(true); }}>
             START BUILDING
@@ -465,9 +465,9 @@ function App() {
             </button>
           </div>
           <div className="flex flex-col gap-6 text-sm font-bold tracking-widest uppercase text-zinc-500">
-            <a href="#" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Platform</a>
-            <a href="#glass-modules" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Architectures</a>
-            <a href="#" className="hover:text-white transition cursor-pointer" onClick={() => { setIsMobileMenuOpen(false); loadDashboardData(); }}>Observability</a>
+            <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Platform</a>
+            <a href="#architectures" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Architectures</a>
+            <a href="#observability" onClick={() => setIsMobileMenuOpen(false)} className="hover:text-white transition">Observability</a>
           </div>
           <button className="mt-auto bg-white text-black px-6 py-4 rounded-full text-xs font-bold hover:scale-105 active:scale-95 transition" onClick={() => { setIsMobileMenuOpen(false); setInitialCreateConfig(null); setIsCreateModalOpen(true); }}>
             START BUILDING
@@ -508,7 +508,7 @@ function App() {
         </header>
 
         {/* Dynamic Analytics Dashboard - Moved Up for Visibility */}
-        <section className="mb-40 relative z-20">
+        <section id="observability" className="mb-40 relative z-20">
           <RagAnalyticsDashboard />
         </section>
 
@@ -647,7 +647,7 @@ function App() {
           </div>
         </section>
 
-        <section className="ent-section" id="glass-modules" style={{ paddingBottom: '20px' }}>
+        <section className="ent-section" id="platform" style={{ paddingBottom: '20px' }}>
           <div className="ent-section-header-row animate-fade-in-up">
             <div>
               <div className="ent-section-label">Platform Modules</div>
@@ -689,7 +689,7 @@ function App() {
           </div>
         </section>
 
-        <section className="ent-section" id="rag-types">
+        <section className="ent-section" id="architectures">
           <div className="ent-section-header-row animate-fade-in-up">
             <div>
               <div className="ent-section-label">RAG Types</div>
