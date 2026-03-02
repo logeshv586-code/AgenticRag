@@ -37,9 +37,13 @@ function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const padding = 20;
+      const isMobile = window.innerWidth < 768;
       // Start in bottom right, but far enough left to fit the wide text bubble (~200px)
-      setPosition({ x: window.innerWidth - 260, y: window.innerHeight - 160 });
+      // If mobile, keep it further down to avoid hero buttons
+      setPosition({
+        x: window.innerWidth - (isMobile ? 100 : 260),
+        y: window.innerHeight - (isMobile ? 100 : 160)
+      });
       setIsPosInitialized(true);
 
       const handleResize = () => {
@@ -473,8 +477,8 @@ function App() {
       <main className="pt-48 px-6 max-w-7xl mx-auto relative z-10 flex-1 w-full pb-20">
 
         {/* V2 Hero */}
-        <header className="text-center mb-40 animate-fade-in-up">
-          <h1 className="font-['Syne'] text-6xl md:text-9xl font-extrabold leading-[0.9] tracking-tighter mb-10">
+        <header className="text-center mb-16 md:mb-40 animate-fade-in-up">
+          <h1 className="font-['Syne'] text-4xl sm:text-6xl md:text-9xl font-extrabold leading-[1.1] md:leading-[0.9] tracking-tighter mb-10">
             Neural <span className="shimmer-text">Architectures</span><br />For Global Data
           </h1>
           <p className="text-zinc-500 text-lg md:text-2xl max-w-3xl mx-auto font-light leading-relaxed mb-12">
@@ -838,8 +842,8 @@ function App() {
         </div>
       )}
 
-      <div className={`fixed bottom-10 right-10 z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
-        <div className="w-[420px] h-[650px] glass-panel rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
+      <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 right-0 sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
+        <div className="w-screen sm:w-[420px] h-[100dvh] sm:h-[650px] glass-panel sm:rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
           <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
             <div className="flex items-center gap-4">
@@ -999,11 +1003,11 @@ function App() {
             </div>
             <div className="flex-1 overflow-y-auto p-6 space-y-6">
               {metrics && (
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-cyan-400">{metrics.total_queries}</div><div className="text-xs text-zinc-400">Total Queries</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-emerald-400">{metrics.total_tokens.toLocaleString()}</div><div className="text-xs text-zinc-400">Tokens Consumed</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-amber-400">{metrics.average_latency.toFixed(2)}s</div><div className="text-xs text-zinc-400">Avg Latency</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-3xl font-bold text-rose-400">{metrics.total_errors}</div><div className="text-xs text-zinc-400">Total Errors</div></div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-cyan-400">{metrics.total_queries}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Queries</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-emerald-400">{metrics.total_tokens.toLocaleString()}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Tokens Consumed</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-amber-400">{metrics.average_latency.toFixed(2)}s</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Avg Latency</div></div>
+                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-rose-400">{metrics.total_errors}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Errors</div></div>
                 </div>
               )}
               {logs && (
