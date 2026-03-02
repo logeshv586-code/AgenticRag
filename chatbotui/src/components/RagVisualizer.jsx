@@ -1,61 +1,52 @@
 import React from 'react';
-import { Database, Search, Bot, Layers, CheckCircle, Globe, Zap, Shield, Eye, Upload, FileText } from 'lucide-react';
+import { Database, Search, Bot, Layers, CheckCircle, Globe, Zap, Shield, Eye, Upload, FileText, Activity } from 'lucide-react';
 
 const NODE_COLORS = {
-    ingestion: { bg: 'bg-orange-500/20', border: 'border-orange-500/30', text: 'text-orange-400', glow: 'shadow-orange-500/10' },
-    embedder: { bg: 'bg-blue-500/20', border: 'border-blue-500/30', text: 'text-blue-400', glow: 'shadow-blue-500/10' },
-    database: { bg: 'bg-indigo-500/20', border: 'border-indigo-500/30', text: 'text-indigo-400', glow: 'shadow-indigo-500/10' },
-    retriever: { bg: 'bg-cyan-500/20', border: 'border-cyan-500/30', text: 'text-cyan-400', glow: 'shadow-cyan-500/10' },
-    reranker: { bg: 'bg-amber-500/20', border: 'border-amber-500/30', text: 'text-amber-400', glow: 'shadow-amber-500/10' },
-    processor: { bg: 'bg-cyan-500/20', border: 'border-cyan-500/30', text: 'text-cyan-400', glow: 'shadow-cyan-500/10' },
-    llm: { bg: 'bg-purple-500/20', border: 'border-purple-500/30', text: 'text-purple-400', glow: 'shadow-purple-500/10' },
-    features: { bg: 'bg-emerald-500/20', border: 'border-emerald-500/30', text: 'text-emerald-400', glow: 'shadow-emerald-500/10' },
-    deployment: { bg: 'bg-rose-500/20', border: 'border-rose-500/30', text: 'text-rose-400', glow: 'shadow-rose-500/10' },
+    ingestion: { color: '#f97316' },
+    embedder: { color: '#3b82f6' },
+    database: { color: '#6366f1' },
+    retriever: { color: '#06b6d4' },
+    reranker: { color: '#f59e0b' },
+    processor: { color: '#10b981' },
+    llm: { color: '#a855f7' },
+    features: { color: '#14b8a6' },
+    deployment: { color: '#f43f5e' },
+};
+
+const THEME_COLORS = {
+    cyan: '#22d3ee',
+    pink: '#ff2e93',
+    emerald: '#10b981',
+    violet: '#8b5cf6',
+    gold: '#fbbf24',
+    red: '#ef4444',
+    teal: '#14b8a6',
+    orange: '#f97316'
 };
 
 const NODE_ICONS = {
     ingestion: Upload, embedder: FileText, database: Database,
     retriever: Search, reranker: Zap, processor: Layers,
-    llm: Bot, features: CheckCircle, deployment: Globe,
+    llm: Bot, features: Shield, deployment: Globe,
 };
 
 const RAG_NAMES = {
-    basic: 'Standard', conversational: 'Conversational', agentic: 'Agentic',
-    structured: 'Graph', multimodal: 'Multimodal', crosslingual: 'Cross-Lingual',
-    citation: 'Citation', realtime: 'Real-Time', personalized: 'Personalized', voice: 'Voice',
+    basic: 'Universal Neural RAG',
+    conversational: 'Enterprise Cognitive RAG',
+    agentic: 'Autonomous Intelligence Node',
+    structured: 'Synaptic Graph',
+    multimodal: 'Global Context RAG',
+    crosslingual: 'Universal Matrix',
+    citation: 'Verified Intelligence',
+    realtime: 'Live Neural Stream',
+    personalized: 'Adaptive Persona',
+    voice: 'Vocal Synthesis Node',
 };
 
 const LLM_NAMES = {
     'qwen-local': 'Qwen 2.5 14B', 'mistral-local': 'Mistral 7B',
     'gpt4o': 'GPT-4o', 'claude35': 'Claude 3.5', 'gemini': 'Gemini Pro',
 };
-
-function ConnectorLine() {
-    return (
-        <div className="flex flex-col items-center justify-center">
-            <div className="w-px h-5 bg-gradient-to-b from-zinc-600 to-zinc-700" />
-            <div className="w-2 h-2 rounded-full bg-zinc-600 border border-zinc-800 -mt-px" />
-        </div>
-    );
-}
-
-function PipelineNode({ label, type, details }) {
-    const colors = NODE_COLORS[type] || NODE_COLORS.processor;
-    const Icon = NODE_ICONS[type] || Layers;
-    return (
-        <div className={`bg-zinc-900/80 border ${colors.border} p-3.5 rounded-xl flex items-center gap-3 w-full shadow-lg ${colors.glow} relative overflow-hidden transition-all duration-300 hover:scale-[1.02]`}>
-            <div className="absolute inset-0 bg-gradient-to-r from-white/[0.02] to-transparent pointer-events-none" />
-            <div className={`${colors.bg} p-2.5 rounded-lg shrink-0`}>
-                <Icon className={`${colors.text} w-4.5 h-4.5`} />
-            </div>
-            <div className="min-w-0 flex-1">
-                <div className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">{type}</div>
-                <div className="text-sm text-white font-semibold truncate">{label}</div>
-                {details && <div className="text-[10px] text-zinc-500 mt-0.5 truncate">{details}</div>}
-            </div>
-        </div>
-    );
-}
 
 export default function RagVisualizer({ config }) {
     const {
@@ -64,7 +55,7 @@ export default function RagVisualizer({ config }) {
         topK = 5, useReranker = false, features = [],
         deploymentType = 'api', scrapeMode = 'static', chunkSize = 500,
         explainability = false, privacyMode = false,
-        dynamicConfig = {}, tuningPreset = null
+        dynamicConfig = {}, tuningPreset = null, theme = 'cyan'
     } = config || {};
 
     const dbName = dbType === 'cloud' ? (cloudDb || 'pinecone') : (localDb || 'chroma');
@@ -72,89 +63,116 @@ export default function RagVisualizer({ config }) {
     if (explainability) allFeatures.push('explainability');
     if (privacyMode) allFeatures.push('privacy');
 
-    // Determine effective settings
     const effChunkSize = tuningPreset ? (tuningPreset === 'fast' ? 1200 : tuningPreset === 'high_accuracy' ? 400 : 800) : chunkSize;
     const effTopK = tuningPreset ? (tuningPreset === 'fast' ? 3 : tuningPreset === 'high_accuracy' ? 10 : 5) : topK;
     const effReranker = tuningPreset ? (tuningPreset === 'high_accuracy' || tuningPreset === 'deep_analysis') : useReranker;
 
     let nodes = [
-        { label: `${scrapeMode === 'dynamic' ? 'Dynamic' : 'Static'} Scraping + OCR`, type: 'ingestion', details: `Chunk: ${effChunkSize} tokens` },
+        { label: `${scrapeMode === 'dynamic' ? 'Dynamic' : 'Static'} Scraping`, type: 'ingestion', details: `Chunks: ${effChunkSize}t` },
     ];
 
-    // Voice special case (audio in)
     if (ragType === 'voice') {
-        nodes = [{ label: 'Audio Input (Microphone)', type: 'processor', details: dynamicConfig.voiceLanguage || 'en-US' }];
-        nodes.push({ label: 'Speech-to-Text (Whisper)', type: 'processor' });
+        nodes = [{ label: 'Audio In (Mic)', type: 'processor', details: dynamicConfig.voiceLanguage || 'en-US' }];
+        nodes.push({ label: 'Speech-to-Text', type: 'processor' });
     }
 
-    // Embedder & DB
-    nodes.push({ label: embeddingModel === 'bge-local' ? 'BGE-m3 (Local)' : embeddingModel, type: 'embedder' });
-    nodes.push({ label: `${dbName.charAt(0).toUpperCase() + dbName.slice(1)} (${dbType})`, type: 'database' });
+    nodes.push({ label: embeddingModel === 'bge-local' ? 'BGE-m3 Local' : embeddingModel, type: 'embedder' });
+    nodes.push({ label: `${dbName.charAt(0).toUpperCase() + dbName.slice(1)} Cloud`, type: 'database', details: dbType.toUpperCase() });
 
-    // Graph RAG adds Graph Store
     if (ragType === 'structured') {
-        nodes.push({ label: 'Entity Extractor (spaCy)', type: 'processor' });
-        nodes.push({ label: 'Knowledge Graph Store', type: 'database', details: 'NetworkX / Neo4j' });
+        nodes.push({ label: 'Entity Extraction', type: 'processor' });
+        nodes.push({ label: 'Knowledge Graph', type: 'database', details: 'Neo4j / NetworkX' });
     }
 
-    nodes.push({ label: `Top-${effTopK} Retriever`, type: 'retriever' });
+    nodes.push({ label: `Top-${effTopK} Retrieval`, type: 'retriever' });
 
     if (ragType === 'structured') {
-        nodes.push({ label: `Graph Traversal (Depth: ${dynamicConfig.relationshipDepth || 2})`, type: 'retriever' });
+        nodes.push({ label: `Graph Traversal (${dynamicConfig.relationshipDepth || 2}-hop)`, type: 'retriever' });
     }
 
     if (effReranker) {
-        nodes.push({ label: 'Neural Reranker', type: 'reranker', details: 'cross-encoder/ms-marco-MiniLM' });
+        nodes.push({ label: 'Neural Reranker', type: 'reranker', details: 'MS-Marco Cross-Encoder' });
     }
 
-    // conversational adds Memory
     if (ragType === 'conversational') {
-        nodes.push({ label: `Context Memory (Window: ${dynamicConfig.historyLength || 10})`, type: 'database', details: 'Thread-safe conversation state' });
+        nodes.push({ label: `Context Memory (${dynamicConfig.historyLength || 10})`, type: 'database', details: 'Session Vector' });
     }
 
-    // Agentic adds Planner & Tool Execution
     if (ragType === 'agentic') {
-        nodes.push({ label: 'Agentic Planner', type: 'processor', details: 'Selects necessary tools' });
-        const toolCount = (dynamicConfig.tools || []).length;
-        nodes.push({ label: `Action Executor (${toolCount > 0 ? toolCount : 'Standard'} Tools)`, type: 'processor' });
+        nodes.push({ label: 'Agentic Planner', type: 'processor', details: 'Task Decomposition' });
+        nodes.push({ label: `Executor Tools (${(dynamicConfig.tools || []).length})`, type: 'processor' });
     }
 
-    // Cross-lingual adds Translation
     if (ragType === 'crosslingual') {
-        nodes.push({ label: 'Language Detector', type: 'processor' });
-        nodes.push({ label: `Translate to English`, type: 'processor', details: 'For optimal retrieval' });
+        nodes.push({ label: 'Lang Detect', type: 'processor' });
+        nodes.push({ label: `Translate -> EN`, type: 'processor' });
     }
 
-    nodes.push({ label: `${RAG_NAMES[ragType] || 'Custom'} RAG Prompt`, type: 'processor' });
-    nodes.push({ label: LLM_NAMES[llmModel] || llmModel, type: 'llm' });
+    nodes.push({ label: `LLM Generator`, type: 'llm', details: LLM_NAMES[llmModel] || llmModel });
 
-    // Cross-lingual translate back
     if (ragType === 'crosslingual') {
-        nodes.push({ label: `Translate to ${dynamicConfig.targetLanguage || 'Target'}`, type: 'processor' });
+        nodes.push({ label: `Translate -> Base`, type: 'processor' });
     }
 
-    // Voice TTS out
     if (ragType === 'voice') {
-        nodes.push({ label: 'Text-to-Speech (Edge TTS)', type: 'processor' });
-        nodes.push({ label: 'Audio Stream Output', type: 'processor' });
+        nodes.push({ label: 'Edge TTS', type: 'processor' });
     }
 
-    if (allFeatures.length > 0) {
-        nodes.push({ label: allFeatures.join(', '), type: 'features' });
-    }
+    nodes.push({ label: 'Output Intercept', type: 'features', details: allFeatures.length ? `${allFeatures.length} policies active` : 'No checks' });
 
-    nodes.push({ label: `${deploymentType.toUpperCase()} Deployment`, type: 'deployment' });
+    nodes.push({ label: `${deploymentType.toUpperCase()} Endpoint`, type: 'deployment', details: 'Ready for use' });
+
+    const activeColor = THEME_COLORS[theme] || THEME_COLORS.cyan;
 
     return (
-        <div className="flex flex-col items-center justify-start space-y-1 p-5 animate-fade-in w-full min-h-max">
-            <h3 className="text-lg font-bold text-white mb-3">Pipeline Architecture</h3>
-            <div className="flex flex-col items-center w-full max-w-sm">
-                {nodes.map((node, i) => (
-                    <React.Fragment key={i}>
-                        {i > 0 && <ConnectorLine />}
-                        <PipelineNode {...node} />
-                    </React.Fragment>
-                ))}
+        <div className="relative w-full h-[320px] bg-[#0b0b0e] border border-white/5 rounded-3xl p-6 overflow-hidden glass-card mt-2 shadow-2xl">
+            {/* Dynamic Animated Grid Background */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none transition-colors duration-1000" style={{ backgroundImage: `radial-gradient(circle at center, ${activeColor} 1px, transparent 1px)`, backgroundSize: '16px 16px' }} />
+
+            {/* Glowing Theme Orb */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full blur-[100px] opacity-[0.15] pointer-events-none transition-colors duration-1000" style={{ backgroundColor: activeColor }} />
+
+            <div className="flex items-center justify-between mb-8 relative z-10">
+                <h3 className="text-xl font-black text-white flex items-center gap-3 tracking-tighter" style={{ textShadow: `0 0 20px ${activeColor}80` }}>
+                    <Activity className="w-5 h-5 animate-pulse" style={{ color: activeColor }} />
+                    Neural Architecture Canvas
+                </h3>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-zinc-500 uppercase tracking-widest">{RAG_NAMES[ragType] || 'Pipeline Node'}</span>
+                    <div className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: activeColor }} />
+                </div>
+            </div>
+
+            <div className="relative z-10 w-full h-40">
+                {/* Visual Connector Line */}
+                <div className="absolute top-[45%] left-0 w-max min-w-full h-0.5 bg-white/5 -translate-y-1/2 pointer-events-none">
+                    <div className="h-full w-1/4 animate-[shimmer_3s_infinite_linear]" style={{ background: `linear-gradient(90deg, transparent, ${activeColor}, transparent)` }} />
+                </div>
+
+                <div className="flex gap-4 h-full overflow-x-auto overflow-y-hidden pb-4 items-center pl-2 pr-10 scrollbar-premium" style={{ scrollSnapType: 'x proximity' }}>
+                    {nodes.map((node, i) => {
+                        const Icon = NODE_ICONS[node.type] || Layers;
+                        const nColor = NODE_COLORS[node.type]?.color || activeColor;
+                        return (
+                            <div key={i} className="relative shrink-0 w-[180px] bg-black/60 backdrop-blur-md border border-white/10 p-5 rounded-2xl group transition-all duration-500 hover:-translate-y-3 hover:shadow-2xl hover:border-white/30" style={{ scrollSnapAlign: 'center', boxShadow: `0 10px 30px transparent` }}>
+                                {/* Hover Glow */}
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl pointer-events-none" />
+
+                                <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center mb-4 transition-transform group-hover:scale-110 shadow-inner group-hover:bg-white/10" style={{ boxShadow: `0 0 20px ${nColor}20` }}>
+                                    <Icon className="w-6 h-6" style={{ color: nColor }} />
+                                </div>
+                                <div className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">{node.type}</div>
+                                <div className="text-sm font-bold text-white truncate group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-zinc-400 transition-colors">{node.label}</div>
+                                <div className="text-xs font-mono text-zinc-500 mt-2 truncate overflow-hidden text-ellipsis bg-black/40 px-2 py-1 rounded inline-block w-full">{node.details || 'SYSTEM'}</div>
+
+                                {/* Connection Dot */}
+                                {i < nodes.length - 1 && (
+                                    <div className="absolute top-[45%] -right-2 h-3 w-3 rounded-full border-2 border-[#0b0b0e] z-10 transition-colors" style={{ backgroundColor: activeColor }} />
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
             </div>
         </div>
     );

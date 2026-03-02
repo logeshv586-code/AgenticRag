@@ -22,16 +22,16 @@ const LOCAL_DBS = [
 ];
 
 const RAG_TYPES = [
-  { id: 'basic', name: 'Standard RAG', desc: 'Standard vector similarity search. Best for simple text Q&A.', icon: Search },
-  { id: 'conversational', name: 'Conversational RAG', desc: 'Maintains long-term chat history for assistants.', icon: MessageCircle },
-  { id: 'multimodal', name: 'Multi-RAG (Multimodal)', desc: 'Handles text, images, and audio seamlessly.', icon: Layers },
-  { id: 'structured', name: 'Graph RAG', desc: 'Deep relationship mapping and reasoning from knowledge graphs.', icon: Workflow },
-  { id: 'agentic', name: 'Agentic RAG', desc: 'Uses tools and reasoning logic to take actions.', icon: Brain },
-  { id: 'realtime', name: 'Real-Time RAG', desc: 'Streams and indexes live data feeds instantly.', icon: Cpu },
-  { id: 'personalized', name: 'Personalized RAG', desc: 'Adapts to user-specific memory and preferences.', icon: Users },
-  { id: 'crosslingual', name: 'Cross-Lingual RAG', desc: 'Translate and retrieve across multiple languages.', icon: Languages },
-  { id: 'voice', name: 'Voice-Ready RAG', desc: 'Speech-to-text input and spoken output.', icon: Mic },
-  { id: 'citation', name: 'Citation-Enabled RAG', desc: 'Provides precise sources and evidence for answers.', icon: Book },
+  { id: 'basic', name: 'Universal Neural RAG', desc: 'Enterprise vector similarity search for foundational data retrieval.', icon: Search },
+  { id: 'conversational', name: 'Enterprise Cognitive RAG', desc: 'Maintains long-term session context for enterprise intelligence assistants.', icon: MessageCircle },
+  { id: 'multimodal', name: 'Global Context RAG (Multimodal)', desc: 'Seamlessly processes distributed text, images, and audio clusters.', icon: Layers },
+  { id: 'structured', name: 'Synaptic Graph Architecture', desc: 'Deep relationship mapping and neural reasoning from knowledge graphs.', icon: Workflow },
+  { id: 'agentic', name: 'Autonomous Intelligence Node', desc: 'Agentic reasoning loops with tools to perform enterprise operations.', icon: Brain },
+  { id: 'realtime', name: 'Live Neural Stream RAG', desc: 'Streams and indexes live data feeds for real-time enterprise insights.', icon: Cpu },
+  { id: 'personalized', name: 'Adaptive Neural Persona', desc: 'Dynamically adapts to user-specific enterprise roles and preferences.', icon: Users },
+  { id: 'crosslingual', name: 'Universal Matrix RAG', desc: 'Translate and retrieve global intelligence across multiple languages natively.', icon: Languages },
+  { id: 'voice', name: 'Vocal Synthesis Node', desc: 'Neural speech-to-text input and natural spoken output pipeline.', icon: Mic },
+  { id: 'citation', name: 'Verified Intelligence RAG', desc: 'Provides cryptographically precise sources and evidence for enterprise audits.', icon: Book },
 ];
 
 const LLM_MODELS = [

@@ -6,6 +6,7 @@ import WaitingRobot from './components/WaitingRobot';
 import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
+import RagAnalyticsDashboard from './components/RagAnalyticsDashboard';
 
 const INITIAL_MESSAGES = [
   {
@@ -174,19 +175,19 @@ function App() {
   }, [termIdx]);
 
   const ragTypes = [
-    { key: 'basic_rag', title: 'Standard RAG', icon: Search, short: 'Neural vector search for precise text retrieval and answering.', works: ['Chunk text precisely', 'Neural embeddings', 'Top-K retrieval', 'Contextual generation'], canDo: ['FAQs', 'Knowledge Bases'], query: 'How does Standard RAG work?' },
-    { key: 'hybrid_rag', title: 'Hybrid RAG', icon: Wand2, short: 'Combines keyword & vector search for maximum recall.', works: ['BM25 + Dense vector', 'Reciprocal Rank Fusion', 'Semantic re-ranking'], canDo: ['Documentation', 'Code Search'], query: 'Why use Hybrid RAG?' },
-    { key: 'conversational_rag', title: 'Conversational RAG', icon: MessageCircle, short: 'Maintains long-term context and chat history.', works: ['Session persistence', 'Context compression', 'Memory management'], canDo: ['Customer Support', 'AI Tutors'], query: 'Explain Conversational RAG memory.' },
-    { key: 'multimodal_rag', title: 'Multi-RAG', icon: Layers, short: 'Seamlessly retrieve images, audio, and video.', works: ['Cross-modal embedding', 'Multi-vector indexing'], canDo: ['Media Search', 'Product Catalogs'], query: 'Show Multi-RAG capabilities.' },
-    { key: 'structured_rag', title: 'Structured RAG', icon: Database, short: 'Query SQL and structured data sources alongside text.', works: ['Text-to-SQL', 'Table parsing'], canDo: ['Data Analysis', 'Financial Reports'], query: 'How does Structured RAG work?' },
-    { key: 'graph_rag', title: 'Graph RAG', icon: Workflow, short: 'Deep reasoning across knowledge graphs and relationships.', works: ['Entity extraction', 'Relationship mapping', 'Graph traversal'], canDo: ['Legal Discovery', 'Medical Research'], query: 'Why use Graph RAG for reasoning?' },
-    { key: 'agentic_rag', title: 'Agentic RAG', icon: Brain, short: 'Reasoning agents that plan and use tools.', works: ['Multi-step planning', 'Tool execution', 'Self-correction'], canDo: ['Data Analysis', 'Web Research'], query: 'Show Agentic RAG in action.' },
-    { key: 'realtime_rag', title: 'Real‑time RAG', icon: Cpu, short: 'Ingest new data and answer on fresh content.', works: ['Streaming ingestion', 'Ephemeral cache'], canDo: ['News', 'Ops alerts'], query: 'How to keep RAG real‑time?' },
-    { key: 'personalized_rag', title: 'Personalized RAG', icon: Users, short: 'Use user profile and preferences in retrieval.', works: ['User context features', 'Scoped indexing'], canDo: ['Portals', 'Learning'], query: 'How to personalize RAG?' },
-    { key: 'xl_rag', title: 'Cross‑lingual RAG', icon: Languages, short: 'Retrieve and answer across languages.', works: ['Multilingual embeddings', 'Optional translation'], canDo: ['Global sites', 'Support'], query: 'How to make RAG multilingual?' },
-    { key: 'voice_rag', title: 'Voice RAG', icon: Mic, short: 'Voice in/out with retrieval and citations.', works: ['STT to query', 'TTS to speak'], canDo: ['Hotline', 'Kiosk'], query: 'Show voice RAG example' },
-    { key: 'citation_rag', title: 'Citation RAG', icon: Book, short: 'Always show sources and evidence.', works: ['Chunk‑level ids', 'Inline references'], canDo: ['Knowledge pages', 'Audits'], query: 'How to ensure citations?' },
-    { key: 'guardrails_rag', title: 'Guardrailed RAG', icon: Shield, short: 'Restrict topics and enforce policies.', works: ['Topic allow/deny', 'Safety checks'], canDo: ['Enterprise', 'Healthcare'], query: 'How to add guardrails?' }
+    { key: 'basic_rag', title: 'Universal Neural RAG', icon: Search, short: 'Neural vector search for precise text retrieval and answering.', works: ['Chunk text precisely', 'Neural embeddings', 'Top-K retrieval', 'Contextual generation'], canDo: ['FAQs', 'Knowledge Bases'], query: 'How does Universal Neural RAG work?' },
+    { key: 'hybrid_rag', title: 'Global Data Integration', icon: Wand2, short: 'Combines keyword & vector search for maximum recall.', works: ['BM25 + Dense vector', 'Reciprocal Rank Fusion', 'Semantic re-ranking'], canDo: ['Documentation', 'Code Search'], query: 'Why use Global Data Integration?' },
+    { key: 'conversational_rag', title: 'Enterprise Cognitive RAG', icon: MessageCircle, short: 'Maintains long-term context and chat history.', works: ['Session persistence', 'Context compression', 'Memory management'], canDo: ['Customer Support', 'AI Tutors'], query: 'Explain Cognitive RAG memory.' },
+    { key: 'multimodal_rag', title: 'Global Context RAG', icon: Layers, short: 'Seamlessly retrieve images, audio, and video.', works: ['Cross-modal embedding', 'Multi-vector indexing'], canDo: ['Media Search', 'Product Catalogs'], query: 'Show Global Context capabilities.' },
+    { key: 'structured_rag', title: 'Structured Intelligence', icon: Database, short: 'Query SQL and structured data sources alongside text.', works: ['Text-to-SQL', 'Table parsing'], canDo: ['Data Analysis', 'Financial Reports'], query: 'How does Structured Intelligence work?' },
+    { key: 'graph_rag', title: 'Synaptic Graph RAG', icon: Workflow, short: 'Deep reasoning across knowledge graphs and relationships.', works: ['Entity extraction', 'Relationship mapping', 'Graph traversal'], canDo: ['Legal Discovery', 'Medical Research'], query: 'Why use Synaptic Graph for reasoning?' },
+    { key: 'agentic_rag', title: 'Autonomous Network', icon: Brain, short: 'Reasoning agents that plan and use tools.', works: ['Multi-step planning', 'Tool execution', 'Self-correction'], canDo: ['Data Analysis', 'Web Research'], query: 'Show Autonomous Network in action.' },
+    { key: 'realtime_rag', title: 'Live Neural Stream', icon: Cpu, short: 'Ingest new data and answer on fresh content.', works: ['Streaming ingestion', 'Ephemeral cache'], canDo: ['News', 'Ops alerts'], query: 'How to keep streams live?' },
+    { key: 'personalized_rag', title: 'Adaptive Persona', icon: Users, short: 'Use user profile and preferences in retrieval.', works: ['User context features', 'Scoped indexing'], canDo: ['Portals', 'Learning'], query: 'How to adapt the persona?' },
+    { key: 'xl_rag', title: 'Universal Matrix', icon: Languages, short: 'Retrieve and answer across languages.', works: ['Multilingual embeddings', 'Optional translation'], canDo: ['Global sites', 'Support'], query: 'How to connect Universal Matrix?' },
+    { key: 'voice_rag', title: 'Vocal Synthesis', icon: Mic, short: 'Voice in/out with retrieval and citations.', works: ['STT to query', 'TTS to speak'], canDo: ['Hotline', 'Kiosk'], query: 'Show Vocal Synthesis example' },
+    { key: 'citation_rag', title: 'Verified Intelligence', icon: Book, short: 'Always show sources and evidence.', works: ['Chunk‑level ids', 'Inline references'], canDo: ['Knowledge pages', 'Audits'], query: 'How to ensure verification?' },
+    { key: 'guardrails_rag', title: 'Policy Guard Architecture', icon: Shield, short: 'Restrict topics and enforce policies.', works: ['Topic allow/deny', 'Safety checks'], canDo: ['Enterprise', 'Healthcare'], query: 'How to enforce Policy Guard?' }
   ];
   const assistantTypes = [
     { key: 'faq', title: 'FAQ Bot', icon: MessageCircle, short: 'Answers common questions with citations.', canDo: ['Website', 'Portals'], query: 'List top FAQs for PSG' },
@@ -404,18 +405,18 @@ function App() {
   };
 
   const chipData = [
-    { icon: <Search className="w-3 h-3 text-cyan-400" />, label: 'Standard RAG' },
-    { icon: <Wand2 className="w-3 h-3 text-[#a78bfa]" />, label: 'Hybrid RAG' },
-    { icon: <MessageCircle className="w-3 h-3 text-[#22c55e]" />, label: 'Conversational' },
-    { icon: <Layers className="w-3 h-3 text-[#f97316]" />, label: 'Multi-RAG' },
-    { icon: <Workflow className="w-3 h-3 text-[#38bdf8]" />, label: 'Graph RAG' },
-    { icon: <Brain className="w-3 h-3 text-[#fde047]" />, label: 'Agentic' },
-    { icon: <Cpu className="w-3 h-3 text-[#60a5fa]" />, label: 'Real-time' },
-    { icon: <Users className="w-3 h-3 text-[#34d399]" />, label: 'Personalized' },
-    { icon: <Languages className="w-3 h-3 text-[#f43f5e]" />, label: 'Cross-lingual' },
-    { icon: <Mic className="w-3 h-3 text-[#00b4d8]" />, label: 'Voice RAG' },
-    { icon: <Book className="w-3 h-3 text-[#eab308]" />, label: 'Citation RAG' },
-    { icon: <Shield className="w-3 h-3 text-[#64748b]" />, label: 'Guardrailed' },
+    { icon: <Search className="w-3 h-3 text-cyan-400" />, label: 'Universal Neural' },
+    { icon: <Wand2 className="w-3 h-3 text-[#a78bfa]" />, label: 'Global Data' },
+    { icon: <MessageCircle className="w-3 h-3 text-[#22c55e]" />, label: 'Cognitive' },
+    { icon: <Layers className="w-3 h-3 text-[#f97316]" />, label: 'Global Context' },
+    { icon: <Workflow className="w-3 h-3 text-[#38bdf8]" />, label: 'Synaptic Graph' },
+    { icon: <Brain className="w-3 h-3 text-[#fde047]" />, label: 'Autonomous' },
+    { icon: <Cpu className="w-3 h-3 text-[#60a5fa]" />, label: 'Live Stream' },
+    { icon: <Users className="w-3 h-3 text-[#34d399]" />, label: 'Adaptive Persona' },
+    { icon: <Languages className="w-3 h-3 text-[#f43f5e]" />, label: 'Universal Matrix' },
+    { icon: <Mic className="w-3 h-3 text-[#00b4d8]" />, label: 'Vocal Synth' },
+    { icon: <Book className="w-3 h-3 text-[#eab308]" />, label: 'Verified Intel' },
+    { icon: <Shield className="w-3 h-3 text-[#64748b]" />, label: 'Policy Guard' },
     { icon: <Briefcase className="w-3 h-3 text-[#22c55e]" />, label: 'HR Assistant' },
     { icon: <Book className="w-3 h-3 text-[#fbbf24]" />, label: 'Document Q&A' },
   ];
@@ -431,7 +432,7 @@ function App() {
       <nav className="fixed top-8 left-0 right-0 z-50 flex justify-center px-4">
         <div className="nav-pill flex items-center justify-between w-full max-w-lg lg:max-w-none lg:w-auto gap-4 lg:gap-12 animate-fade-in-up">
           <div className="flex items-center gap-3 font-['Syne'] font-bold text-xl tracking-tighter">
-            <span className="text-cyan-400">⚡</span> AI.OS
+            <span className="text-cyan-400">⚡</span> OmniRAG Engine
           </div>
 
           {/* Burger Menu for Mobile */}
@@ -458,7 +459,7 @@ function App() {
         <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsMobileMenuOpen(false)}></div>
         <div className={`absolute right-0 top-0 bottom-0 w-64 glass-panel border-l border-white/10 p-8 flex flex-col gap-8 transition-transform duration-500 ${isMobileMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
           <div className="flex justify-between items-center">
-            <div className="font-['Syne'] font-bold text-xl tracking-tighter">AI.OS</div>
+            <div className="font-['Syne'] font-bold text-xl tracking-tighter">OmniRAG Engine</div>
             <button onClick={() => setIsMobileMenuOpen(false)} className="text-zinc-400 hover:text-white">
               <X className="w-6 h-6" />
             </button>
@@ -479,7 +480,7 @@ function App() {
         {/* V2 Hero */}
         <header className="text-center mb-16 md:mb-40 animate-fade-in-up">
           <h1 className="font-['Syne'] text-4xl sm:text-6xl md:text-9xl font-extrabold leading-[1.1] md:leading-[0.9] tracking-tighter mb-10">
-            Neural <span className="shimmer-text">Architectures</span><br />For Global Data
+            OmniRAG <span className="shimmer-text">Engine</span>
           </h1>
           <p className="text-zinc-500 text-lg md:text-2xl max-w-3xl mx-auto font-light leading-relaxed mb-12">
             Unified RAG infrastructure for enterprise intelligence.
@@ -505,6 +506,11 @@ function App() {
             </div>
           </div>
         </header>
+
+        {/* Dynamic Analytics Dashboard - Moved Up for Visibility */}
+        <section className="mb-40 relative z-20">
+          <RagAnalyticsDashboard />
+        </section>
 
         {/* Advanced Feature: Architecture Flow */}
         <section className="mb-40 animate-fade-in-up animation-delay-200">
@@ -653,19 +659,19 @@ function App() {
             <GlassIcons onSelect={(it) => {
               const byTitle = (arr, t) => arr.find(x => x.title === t);
               const map = {
-                'Basic RAG': 'Standard RAG',
-                'Hybrid RAG': 'Hybrid RAG',
-                'Conversational': 'Conversational RAG',
-                'Multimodal': 'Multi-RAG',
-                'Structured': 'Structured RAG',
-                'Graph': 'Graph RAG',
-                'Agentic': 'Agentic RAG',
-                'Realtime': 'Real‑time RAG',
-                'Personalized': 'Personalized RAG',
-                'Cross‑lingual': 'Cross‑lingual RAG',
-                'Voice': 'Voice RAG',
-                'Citations': 'Citation RAG',
-                'Guardrails': 'Guardrailed RAG',
+                'Universal Neural': 'Universal Neural RAG',
+                'Global Data': 'Global Data Integration',
+                'Cognitive': 'Enterprise Cognitive RAG',
+                'Global Context': 'Global Context RAG',
+                'Structured Intel': 'Structured Intelligence',
+                'Synaptic Graph': 'Synaptic Graph RAG',
+                'Autonomous': 'Autonomous Network',
+                'Live Stream': 'Live Neural Stream',
+                'Adaptive Persona': 'Adaptive Persona',
+                'Universal Matrix': 'Universal Matrix',
+                'Vocal Synth': 'Vocal Synthesis',
+                'Verified Intel': 'Verified Intelligence',
+                'Policy Guard': 'Policy Guard Architecture',
                 'Sales': 'Sales Assistant',
                 'HR': 'HR Assistant',
               };
@@ -766,81 +772,83 @@ function App() {
         </footer>
       </main>
 
-      {selected && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={closeModal}></div>
-          <div className="relative w-full sm:w-[720px] bg-[#0b0b0e] border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
-                  {selected.item.icon ? <selected.item.icon className="w-5 h-5 text-[#22d3ee]" /> : <Bot className="w-5 h-5 text-[#22d3ee]" />}
-                </div>
-                <div className="text-lg font-semibold">{selected.item.title}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={toggleListening} className={`px-3 py-2 rounded-full border ${isListening ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-zinc-700 bg-zinc-900 text-zinc-300'}`}>
-                  <div className="flex items-center gap-2">
-                    <Mic className="w-4 h-4" />
-                    <span className="text-sm">{isListening ? 'Listening' : 'Voice'}</span>
+      {
+        selected && (
+          <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
+            <div className="absolute inset-0 bg-black/60" onClick={closeModal}></div>
+            <div className="relative w-full sm:w-[720px] bg-[#0b0b0e] border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center">
+                    {selected.item.icon ? <selected.item.icon className="w-5 h-5 text-[#22d3ee]" /> : <Bot className="w-5 h-5 text-[#22d3ee]" />}
                   </div>
-                </button>
-                <button onClick={closeModal} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="p-5 space-y-5">
-              <div className="text-sm text-zinc-300">{selected.item.short}</div>
-              {selected.item.works && (
-                <div>
-                  <div className="text-sm font-semibold mb-2">How it works</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selected.item.works.map((w, i) => (
-                      <span key={i} className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">{w}</span>
-                    ))}
-                  </div>
+                  <div className="text-lg font-semibold">{selected.item.title}</div>
                 </div>
-              )}
-              {selected.item.canDo && (
-                <div>
-                  <div className="text-sm font-semibold mb-2">What you can build</div>
-                  <div className="flex flex-wrap gap-2">
-                    {selected.item.canDo.map((w, i) => (
-                      <span key={i} className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">{w}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-800">
-                <button
-                  onClick={() => {
-                    setInitialCreateConfig({ ragType: selected.item.key, useCase: selected.type === 'assistant' ? selected.item.key : '' });
-                    setIsCreateModalOpen(true);
-                    closeModal();
-                  }}
-                  className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#22d3ee] to-blue-500 text-white font-bold hover:scale-[1.02] transition active:scale-95"
-                >
-                  <Wand2 className="w-5 h-5" />
-                  Create this RAG
-                </button>
-              </div>
-
-              <div className="flex items-center gap-3">
-                {selected.item.query && (
-                  <button onClick={() => applySampleQuery(selected.item.query)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 hover:text-white transition">
-                    <MessageCircle className="w-4 h-4" />
-                    Try sample query
+                <div className="flex items-center gap-2">
+                  <button onClick={toggleListening} className={`px-3 py-2 rounded-full border ${isListening ? 'border-cyan-500 bg-cyan-500 text-black' : 'border-zinc-700 bg-zinc-900 text-zinc-300'}`}>
+                    <div className="flex items-center gap-2">
+                      <Mic className="w-4 h-4" />
+                      <span className="text-sm">{isListening ? 'Listening' : 'Voice'}</span>
+                    </div>
                   </button>
+                  <button onClick={closeModal} className="p-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-5 space-y-5">
+                <div className="text-sm text-zinc-300">{selected.item.short}</div>
+                {selected.item.works && (
+                  <div>
+                    <div className="text-sm font-semibold mb-2">How it works</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selected.item.works.map((w, i) => (
+                        <span key={i} className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">{w}</span>
+                      ))}
+                    </div>
+                  </div>
                 )}
-                <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition text-sm">
-                  <Bot className="w-4 h-4" />
-                  Open chat
-                </button>
+                {selected.item.canDo && (
+                  <div>
+                    <div className="text-sm font-semibold mb-2">What you can build</div>
+                    <div className="flex flex-wrap gap-2">
+                      {selected.item.canDo.map((w, i) => (
+                        <span key={i} className="text-xs px-2 py-1 rounded-full bg-zinc-800 text-zinc-300 border border-zinc-700">{w}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3 mt-4 pt-4 border-t border-zinc-800">
+                  <button
+                    onClick={() => {
+                      setInitialCreateConfig({ ragType: selected.item.key, useCase: selected.type === 'assistant' ? selected.item.key : '' });
+                      setIsCreateModalOpen(true);
+                      closeModal();
+                    }}
+                    className="inline-flex flex-1 items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-[#22d3ee] to-blue-500 text-white font-bold hover:scale-[1.02] transition active:scale-95"
+                  >
+                    <Wand2 className="w-5 h-5" />
+                    Create this RAG
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {selected.item.query && (
+                    <button onClick={() => applySampleQuery(selected.item.query)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-800 text-zinc-300 font-semibold text-sm hover:bg-zinc-700 hover:text-white transition">
+                      <MessageCircle className="w-4 h-4" />
+                      Try sample query
+                    </button>
+                  )}
+                  <button onClick={() => setIsOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400 hover:text-zinc-200 transition text-sm">
+                    <Bot className="w-4 h-4" />
+                    Open chat
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 right-0 sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
         <div className="w-screen sm:w-[420px] h-[100dvh] sm:h-[650px] glass-panel sm:rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
@@ -974,77 +982,81 @@ function App() {
         </div>
       </div>
 
-      {isPosInitialized && (
-        <div
-          className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
-          style={{ left: position.x, top: position.y }}
-          onMouseDown={handleDragStart}
-          onClick={() => {
-            if (!hasMoved) setIsOpen(true);
-          }}
-        >
-          <div className="relative w-[60px] h-[60px] flex items-center justify-center overflow-visible group/bot">
-            {/* Robot Container - Small and precise */}
-            <div className="scale-[0.85] drop-shadow-[0_0_20px_rgba(0,210,255,0.3)] group-hover:scale-[0.95] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
-              <Robot3D />
+      {
+        isPosInitialized && (
+          <div
+            className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
+            style={{ left: position.x, top: position.y }}
+            onMouseDown={handleDragStart}
+            onClick={() => {
+              if (!hasMoved) setIsOpen(true);
+            }}
+          >
+            <div className="relative w-[60px] h-[60px] flex items-center justify-center overflow-visible group/bot">
+              {/* Robot Container - Small and precise */}
+              <div className="scale-[0.85] drop-shadow-[0_0_20px_rgba(0,210,255,0.3)] group-hover:scale-[0.95] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+                <Robot3D />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Observability Dashboard Modal */}
-      {isDashboardOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in backdrop-blur-sm bg-black/50">
-          <div className="absolute inset-0 bg-zinc-950/80" onClick={() => setIsDashboardOpen(false)} />
-          <div className="relative w-full max-w-5xl bg-[#0b0b0e]/90 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[800px] animate-slide-up glass-card">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Database className="text-cyan-400" /> Platform Observability Dashboard</h2>
-              <button onClick={() => setIsDashboardOpen(false)} className="p-2 hover:bg-white/5 rounded-full"><X className="w-5 h-5 text-zinc-400" /></button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
-              {metrics && (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-cyan-400">{metrics.total_queries}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Queries</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-emerald-400">{metrics.total_tokens.toLocaleString()}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Tokens Consumed</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-amber-400">{metrics.average_latency.toFixed(2)}s</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Avg Latency</div></div>
-                  <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-rose-400">{metrics.total_errors}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Errors</div></div>
-                </div>
-              )}
-              {logs && (
-                <div className="bg-white/5 border border-white/5 rounded-2xl p-4 overflow-hidden">
-                  <h3 className="text-lg font-semibold text-white mb-4">Recent Query Logs</h3>
-                  <div className="w-full overflow-x-auto">
-                    <table className="w-full text-left text-sm text-zinc-300">
-                      <thead>
-                        <tr className="border-b border-white/10 text-zinc-500">
-                          <th className="py-2 px-2">Time</th>
-                          <th className="py-2 px-2">Pipeline</th>
-                          <th className="py-2 px-2">Model</th>
-                          <th className="py-2 px-2">Latency</th>
-                          <th className="py-2 px-2">Tokens</th>
-                          <th className="py-2 px-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {logs.map((log, i) => (
-                          <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                            <td className="py-2 px-2 text-xs">{new Date(log.timestamp).toLocaleTimeString()}</td>
-                            <td className="py-2 px-2">{log.pipeline_id}</td>
-                            <td className="py-2 px-2">{log.model_name || 'unknown'}</td>
-                            <td className="py-2 px-2">{log.latency.toFixed(2)}s</td>
-                            <td className="py-2 px-2">{log.tokens}</td>
-                            <td className="py-2 px-2">{log.error ? <span className="text-rose-400">Error</span> : <span className="text-emerald-400">OK</span>}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+      {
+        isDashboardOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in backdrop-blur-sm bg-black/50">
+            <div className="absolute inset-0 bg-zinc-950/80" onClick={() => setIsDashboardOpen(false)} />
+            <div className="relative w-full max-w-5xl bg-[#0b0b0e]/90 backdrop-blur-2xl border border-white/10 rounded-[32px] shadow-2xl overflow-hidden flex flex-col h-[800px] animate-slide-up glass-card">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-white/5">
+                <h2 className="text-xl font-bold text-white flex items-center gap-2"><Database className="text-cyan-400" /> Platform Observability Dashboard</h2>
+                <button onClick={() => setIsDashboardOpen(false)} className="p-2 hover:bg-white/5 rounded-full"><X className="w-5 h-5 text-zinc-400" /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {metrics && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-cyan-400">{metrics.total_queries}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Queries</div></div>
+                    <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-emerald-400">{metrics.total_tokens.toLocaleString()}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Tokens Consumed</div></div>
+                    <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-amber-400">{metrics.average_latency.toFixed(2)}s</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Avg Latency</div></div>
+                    <div className="bg-white/5 border border-white/5 p-4 rounded-2xl text-center"><div className="text-xl sm:text-3xl font-bold text-rose-400">{metrics.total_errors}</div><div className="text-[10px] sm:text-xs text-zinc-400 uppercase tracking-wider">Total Errors</div></div>
                   </div>
-                </div>
-              )}
+                )}
+                {logs && (
+                  <div className="bg-white/5 border border-white/5 rounded-2xl p-4 overflow-hidden">
+                    <h3 className="text-lg font-semibold text-white mb-4">Recent Query Logs</h3>
+                    <div className="w-full overflow-x-auto">
+                      <table className="w-full text-left text-sm text-zinc-300">
+                        <thead>
+                          <tr className="border-b border-white/10 text-zinc-500">
+                            <th className="py-2 px-2">Time</th>
+                            <th className="py-2 px-2">Pipeline</th>
+                            <th className="py-2 px-2">Model</th>
+                            <th className="py-2 px-2">Latency</th>
+                            <th className="py-2 px-2">Tokens</th>
+                            <th className="py-2 px-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {logs.map((log, i) => (
+                            <tr key={i} className="border-b border-white/5 hover:bg-white/5">
+                              <td className="py-2 px-2 text-xs">{new Date(log.timestamp).toLocaleTimeString()}</td>
+                              <td className="py-2 px-2">{log.pipeline_id}</td>
+                              <td className="py-2 px-2">{log.model_name || 'unknown'}</td>
+                              <td className="py-2 px-2">{log.latency.toFixed(2)}s</td>
+                              <td className="py-2 px-2">{log.tokens}</td>
+                              <td className="py-2 px-2">{log.error ? <span className="text-rose-400">Error</span> : <span className="text-emerald-400">OK</span>}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       <CreateRagModal
         isOpen={isCreateModalOpen}
@@ -1062,7 +1074,7 @@ function App() {
           setIsOpen(true);
         }}
       />
-    </div>
+    </div >
   );
 }
 
