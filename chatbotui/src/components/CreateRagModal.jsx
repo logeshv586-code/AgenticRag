@@ -87,7 +87,10 @@ const LANGUAGES = [
 export default function CreateRagModal({ isOpen, onClose, onComplete, initialConfig }) {
   const [step, setStep] = useState(1);
   const [config, setConfig] = useState({
-    // Step 1: Data
+    // Step 1: Naming
+    ragName: '',
+
+    // Step 2: Data
     urls: [''],
     files: [],
 
@@ -128,6 +131,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
   const [deployData, setDeployData] = useState(null);
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployProgress, setDeployProgress] = useState(0);
+  const [isIngesting, setIsIngesting] = useState(false);
 
   React.useEffect(() => {
     if (isOpen) {
@@ -140,10 +144,57 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
 
   if (!isOpen) return null;
 
-  const totalSteps = 10;
+  const totalSteps = 11;
 
   const handleNext = async () => {
-    if (step === 9) {
+    // If moving past Step 2 (Data sources), trigger ingest first
+    if (step === 2) {
+      const validUrls = config.urls.filter(u => u.trim());
+      if (validUrls.length === 0 && config.files.length === 0) {
+        alert("Please provide at least one data source.");
+        return;
+      }
+      if (!config.ragName) {
+        alert("Please provide a name for your RAG in the previous step.");
+        setStep(1);
+        return;
+      }
+
+      setIsIngesting(true);
+      try {
+        // Scrape Process
+        if (validUrls.length > 0) {
+          await fetch('http://localhost:8000/api/ingest', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              ragName: config.ragName,
+              urls: validUrls,
+              mode: config.scrapeMode
+            })
+          });
+        }
+
+        // Upload Process
+        for (const file of config.files) {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('ragName', config.ragName);
+          await fetch('http://localhost:8000/api/upload', {
+            method: 'POST',
+            body: formData
+          });
+        }
+      } catch (e) {
+        console.error("Ingestion error", e);
+      } finally {
+        setIsIngesting(false);
+        setStep(3); // Move to Database Selection
+      }
+      return;
+    }
+
+    if (step === 10) {
       await handleDeploy();
     } else if (step < totalSteps) {
       setStep(step + 1);
@@ -173,47 +224,18 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
   };
 
   const handleDeploy = async () => {
-    setStep(10); // Move to deployment status step
+    setStep(11); // Move to deployment status step
     setIsDeploying(true);
     setDeployProgress(10);
 
-    let extractedTexts = [];
-
     try {
-      setDeployProgress(30);
-      const validUrls = config.urls.filter(u => u.trim());
-      if (validUrls.length > 0) {
-        const scrapeRes = await fetch('http://localhost:8000/api/scrape', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ urls: validUrls })
-        });
-        if (scrapeRes.ok) {
-          const data = await scrapeRes.json();
-          if (data.texts) extractedTexts.push(...data.texts);
-        }
-      }
-
       setDeployProgress(50);
-      for (const file of config.files) {
-        const formData = new FormData();
-        formData.append('file', file);
-        const uploadRes = await fetch('http://localhost:8000/api/upload', {
-          method: 'POST',
-          body: formData
-        });
-        if (uploadRes.ok) {
-          const data = await uploadRes.json();
-          if (data.text) extractedTexts.push(`Source: ${file.name}\n${data.text}`);
-        }
-      }
-
-      setDeployProgress(70);
       const deployRes = await fetch('http://localhost:8000/api/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          extracted_texts: extractedTexts,
+          ragName: config.ragName,
+          extracted_texts: [], // Backend will read from data folder
           ragType: config.ragType,
           dbType: config.dbType,
           cloudDb: config.cloudDb,
@@ -287,13 +309,33 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
 
           {/* BACKGROUND ICON INDICATORS FOR AESTHETICS */}
           <div className="absolute right-0 top-1/2 -translate-y-1/2 opacity-5 pointer-events-none overflow-hidden">
-            {step === 1 && <Database className="w-96 h-96 -mr-20" />}
-            {step === 2 && <LayoutTemplate className="w-96 h-96 -mr-20" />}
-            {step === 6 && <Layers className="w-96 h-96 -mr-20" />}
-            {step === 9 && <MessageSquare className="w-96 h-96 -mr-20" />}
+            {step === 1 && <Bot className="w-96 h-96 -mr-20" />}
+            {step === 2 && <Database className="w-96 h-96 -mr-20" />}
+            {step === 3 && <LayoutTemplate className="w-96 h-96 -mr-20" />}
+            {step === 7 && <Layers className="w-96 h-96 -mr-20" />}
+            {step === 10 && <MessageSquare className="w-96 h-96 -mr-20" />}
           </div>
 
           {step === 1 && (
+            <div className="space-y-8 animate-fade-in flex flex-col justify-center h-full sm:px-12">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-cyan-500/20 rounded-full flex items-center justify-center border border-cyan-500/50 mb-6 mx-auto shadow-[0_0_30px_rgba(6,182,212,0.3)]">
+                  <Wand2 className="w-10 h-10 text-cyan-400" />
+                </div>
+                <h3 className="text-3xl font-bold text-white mb-4">Name Your Agent</h3>
+                <p className="text-zinc-400 mb-8 max-w-sm mx-auto">Give your new cognitive node an identity before providing it with enterprise data.</p>
+                <input
+                  type="text"
+                  value={config.ragName}
+                  onChange={(e) => updateConfig('ragName', e.target.value)}
+                  placeholder="e.g. Sales Copilot, Tech Support AI"
+                  className="w-full max-w-md mx-auto block bg-black/50 border border-zinc-700/50 rounded-2xl px-6 py-4 text-center text-white text-xl placeholder-zinc-700 focus:outline-none focus:border-cyan-500/70 focus:ring-2 focus:ring-cyan-500/20 transition-all font-semibold"
+                />
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
             <div className="space-y-8 animate-fade-in">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-3 mb-2 text-premium">
@@ -366,7 +408,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 2 && (
+          {step === 3 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Database className="w-5 h-5 text-cyan-400" /> Vector Database & Storage
@@ -422,6 +464,26 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         </button>
                       ))}
                     </div>
+
+                    {/* API Key Input — shown for selected Cloud DB */}
+                    {(() => {
+                      const sel = CLOUD_DBS.find(db => db.id === config.cloudDb);
+                      if (sel) {
+                        return (
+                          <div className="mt-4 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+                            <label className="text-xs text-zinc-400 flex items-center gap-2 mb-2"><Key className="w-3.5 h-3.5" /> {sel.name} API Key / Credentials</label>
+                            <input
+                              type="password"
+                              value={config.apiKeys?.[sel.id] || ''}
+                              onChange={(e) => setConfig(prev => ({ ...prev, apiKeys: { ...prev.apiKeys, [sel.id]: e.target.value } }))}
+                              placeholder={`Enter your ${sel.name} API key or connection string`}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white text-sm focus:border-cyan-500/50 focus:outline-none"
+                            />
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
 
@@ -449,7 +511,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 3 && (
+          {step === 4 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <LayoutTemplate className="w-5 h-5 text-cyan-400" /> Architecture Selection
@@ -482,7 +544,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 4 && (
+          {step === 5 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Settings2 className="w-5 h-5 text-cyan-400" /> Dynamic Configuration
@@ -642,7 +704,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 5 && (
+          {step === 6 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Bot className="w-5 h-5 text-cyan-400" /> Models
@@ -718,7 +780,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 6 && (
+          {step === 7 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xl font-semibold text-white flex items-center gap-2">
@@ -824,7 +886,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 7 && (
+          {step === 8 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Palette className="w-5 h-5 text-cyan-400" /> Features & Theming
@@ -887,7 +949,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 8 && (
+          {step === 9 && (
             <div className="animate-fade-in relative z-10 h-full flex flex-col -mt-4">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Layers className="w-5 h-5 text-cyan-400" /> Architecture Graph
@@ -899,7 +961,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 9 && (
+          {step === 10 && (
             <div className="space-y-6 animate-fade-in relative z-10">
               <h3 className="text-xl font-semibold text-white flex items-center gap-2 mb-2">
                 <Globe className="w-5 h-5 text-cyan-400" /> Deployment Options
@@ -951,7 +1013,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </div>
           )}
 
-          {step === 10 && (
+          {step === 11 && (
             <div className="space-y-8 animate-fade-in flex flex-col items-center justify-center h-full">
               {isDeploying ? (
                 <>
@@ -994,8 +1056,14 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
         </div>
 
         {/* Footer Navigation */}
-        {(step < 10) && (
-          <div className="p-6 border-t border-white/5 bg-zinc-950 flex items-center justify-between z-20 shrink-0">
+        {(step < 11) && (
+          <div className="p-6 border-t border-white/5 bg-zinc-950 flex items-center justify-between z-20 shrink-0 relative">
+            {isIngesting && (
+              <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm z-10 flex items-center justify-center gap-3">
+                <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                <span className="text-cyan-400 font-medium text-sm">Processing & Storing Knowledge...</span>
+              </div>
+            )}
             <button
               onClick={() => step > 1 && setStep(step - 1)}
               className={`text-sm font-medium ${step === 1 ? 'opacity-0 pointer-events-none' : 'text-zinc-400 hover:text-white transition'}`}
@@ -1004,15 +1072,16 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
             </button>
             <button
               onClick={handleNext}
-              className={`px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold rounded-full flex items-center gap-2 transition active:scale-95`}
+              disabled={isIngesting || (step === 1 && !config.ragName)}
+              className={`px-6 py-2.5 bg-white hover:bg-zinc-200 text-black font-semibold rounded-full flex items-center gap-2 transition active:scale-95 disabled:opacity-50`}
             >
-              {step === 9 ? 'Initialize Deployment' : 'Next'}
+              {step === 10 ? 'Initialize Deployment' : 'Next'}
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {(step === 10 && !isDeploying) && (
+        {(step === 11 && !isDeploying) && (
           <div className="p-4 border-t border-white/5 bg-zinc-950 flex items-center justify-end z-20 shrink-0">
             <button
               onClick={handleNext}

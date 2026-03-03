@@ -1,0 +1,32 @@
+{
+  "pipeline_id": "pipe_4aeb249b",
+  "config": {
+    "ragType": "hybrid",
+    "dbType": "local",
+    "localDb": "chroma",
+    "cloudDb": "",
+    "dynamicConfig": {},
+    "llmModel": "qwen-local",
+    "embeddingModel": "bge-local",
+    "chunkSize": 500,
+    "topK": 5,
+    "useReranker": false,
+    "theme": "emerald",
+    "features": [
+      "citations"
+    ],
+    "apiKeys": {},
+    "privacyMode": false,
+    "explainability": false
+  },
+  "deployment": {
+    "pipeline_id": "pipe_4aeb249b",
+    "type": "hybrid",
+    "db_type": "local",
+    "documents_processed": 1,
+    "total_characters": 5619,
+    "deployment_type": "api",
+    "query_endpoint": "http://localhost:8000/api/test-chat",
+    "api_deployed": true
+  }
+}

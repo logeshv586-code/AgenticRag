@@ -87,6 +87,7 @@ class ChatRequest(BaseModel):
     audio_base64: Optional[str] = None  # For Voice RAG pipeline
 
 class DeployRequest(BaseModel):
+    ragName: str
     extracted_texts: List[str]
     ragType: str
     dbType: str
@@ -134,17 +135,62 @@ async def api_scrape(req: ScrapeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class IngestRequest(BaseModel):
+    ragName: str
+    urls: List[str]
+    mode: str = "static"
+
+@app.post("/api/ingest")
+async def api_ingest(req: IngestRequest):
+    """Scrapes URLs and saves the extracted texts to a specific RAG folder."""
+    if not req.ragName:
+        raise HTTPException(status_code=400, detail="ragName is required")
+        
+    try:
+        # Create directory
+        base_dir = os.path.join(os.path.dirname(__file__), "data", req.ragName)
+        os.makedirs(base_dir, exist_ok=True)
+        
+        # Scrape
+        texts = scrape_urls(req.urls, mode=req.mode)
+        
+        # Save raw data
+        raw_file_path = os.path.join(base_dir, "scraped_data.txt")
+        with open(raw_file_path, "w", encoding="utf-8") as f:
+            for text in texts:
+                f.write(text + "\n\n" + "="*50 + "\n\n")
+                
+        logger.info(f"Ingested {len(req.urls)} URLs for RAG: {req.ragName}")
+        return {
+            "status": "success", 
+            "message": f"Successfully ingested data for {req.ragName}",
+            "texts_count": len(texts),
+            "data_dir": base_dir
+        }
+    except Exception as e:
+        logger.error(f"Ingest error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/upload")
-async def api_upload(file: UploadFile = File(...)):
+async def api_upload(ragName: str = Form(...), file: UploadFile = File(...)):
     temp_path = None
     try:
-        temp_path = f"temp_{file.filename}"
+        # Create directory
+        base_dir = os.path.join(os.path.dirname(__file__), "data", ragName)
+        os.makedirs(base_dir, exist_ok=True)
+        
+        temp_path = os.path.join(base_dir, f"temp_{file.filename}")
         with open(temp_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
 
         text = parse_document(temp_path)
         os.remove(temp_path)
+        
+        # Save parsed data alongside scraped data
+        raw_file_path = os.path.join(base_dir, "scraped_data.txt")
+        with open(raw_file_path, "a", encoding="utf-8") as f:
+             f.write(f"Source: {file.filename}\n{text}\n\n" + "="*50 + "\n\n")
 
         return {"status": "success", "text": text}
     except Exception as e:
@@ -219,6 +265,22 @@ async def api_deploy(req: DeployRequest):
         config = req.model_dump()
         # Apply tuning preset if in Simple mode
         config = apply_tuning_preset(config)
+        
+        # Look up any previously ingested data for this RAG if extracted_texts is empty
+        if not config.get("extracted_texts") and config.get("ragName"):
+            rag_dir = os.path.join(os.path.dirname(__file__), "data", config["ragName"])
+            scraped_file = os.path.join(rag_dir, "scraped_data.txt")
+            if os.path.exists(scraped_file):
+                # We optionally just pass the file path to haystack service, but for now we read it back 
+                # to keep haystack_service.py untouched. If the file is huge, this might OOM, 
+                # but it matches the previous flow exactly.
+                with open(scraped_file, "r", encoding="utf-8") as f:
+                     content = f.read()
+                     # Split by our delimiter
+                     parts = [p.strip() for p in content.split("="*50) if p.strip()]
+                     config["extracted_texts"] = parts
+                     logger.info(f"Loaded {len(parts)} local texts for {config['ragName']}")
+
         deployment_info = deploy_rag_system(config)
         pipeline_id = deployment_info.get("pipeline_id", "mock_pipeline_123")
         return {
@@ -235,8 +297,10 @@ async def api_deploy(req: DeployRequest):
 @app.get("/api/visualize/{pipeline_id}")
 async def api_visualize(pipeline_id: str):
     """Returns real pipeline graph data for visualization."""
+    from services.haystack_service import pipeline_metadata
     graph = get_pipeline_graph(pipeline_id)
-    return {"status": "success", **graph}
+    meta = pipeline_metadata.get(pipeline_id, {})
+    return {"status": "success", "metadata": meta, **graph}
 
 
 # ═══════════════════════════════════════════════════════════

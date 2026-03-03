@@ -1,0 +1,57 @@
+{
+  "pipeline_id": "pipe_a3ba4063",
+  "config": {
+    "ragName": "EraTimbersTest",
+    "ragType": "realtime",
+    "dbType": "local",
+    "cloudDb": "",
+    "localDb": "chroma",
+    "dynamicConfig": {
+      "sourceLanguage": "auto",
+      "targetLanguage": "English",
+      "voiceLanguage": "en-US",
+      "historyLength": 5,
+      "modalities": [
+        "text",
+        "images"
+      ],
+      "entityTypes": [
+        "Organization",
+        "Product"
+      ],
+      "relationshipDepth": 2,
+      "refreshInterval": 60,
+      "profileFields": [
+        "Role"
+      ],
+      "citationStyle": "inline"
+    },
+    "llmModel": "qwen-local",
+    "embeddingModel": "bge-local",
+    "chunkSize": 500,
+    "topK": 3,
+    "useReranker": false,
+    "theme": "cyan",
+    "features": [],
+    "deploymentType": "api",
+    "apiKeys": {},
+    "privacyMode": false,
+    "explainability": false,
+    "scrapeMode": "static",
+    "tuningPreset": null,
+    "hallucinationGuard": false,
+    "toxicityFilter": false,
+    "structuredOutput": false,
+    "streamingResponse": false
+  },
+  "deployment": {
+    "pipeline_id": "pipe_a3ba4063",
+    "type": "realtime",
+    "db_type": "local",
+    "documents_processed": 1,
+    "total_characters": 5619,
+    "deployment_type": "api",
+    "query_endpoint": "http://localhost:8000/api/test-chat",
+    "api_deployed": true
+  }
+}

@@ -259,6 +259,7 @@ def _local_qwen_generator():
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="Qwen2.5-14B-Instruct-1M-Q3_K_L.gguf",
         generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
     )
 
 
@@ -269,6 +270,7 @@ def _local_mistral_generator():
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="mistral",
         generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
     )
 
 
@@ -280,6 +282,7 @@ def _local_llama3_generator():
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="llama3",
         generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
     )
 
 
@@ -291,6 +294,7 @@ def _local_deepseek_generator():
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="deepseek",
         generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
     )
 
 
@@ -348,6 +352,7 @@ def _ollama_generator(api_key: Optional[str] = None):
         api_base_url=f"http://localhost:{OLLAMA_PORT}/v1",
         model=model_name,
         generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
     )
 
 
