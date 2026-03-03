@@ -39,11 +39,10 @@ function App() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const isMobile = window.innerWidth < 768;
-      // Start in bottom right, but far enough left to fit the wide text bubble (~200px)
-      // If mobile, keep it further down to avoid hero buttons
+      // Position in bottom-right corner with a small gap
       setPosition({
-        x: window.innerWidth - (isMobile ? 100 : 260),
-        y: window.innerHeight - (isMobile ? 100 : 160)
+        x: window.innerWidth - (isMobile ? 80 : 90),
+        y: window.innerHeight - (isMobile ? 80 : 90)
       });
       setIsPosInitialized(true);
 
@@ -1001,9 +1000,9 @@ function App() {
               if (!hasMoved) setIsOpen(true);
             }}
           >
-            <div className="relative w-[60px] h-[60px] flex items-center justify-center overflow-visible group/bot">
-              {/* Robot Container - Small and precise */}
-              <div className="scale-[0.85] drop-shadow-[0_0_20px_rgba(0,210,255,0.3)] group-hover:scale-[0.95] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+            <div className="relative w-[50px] h-[50px] flex items-center justify-center overflow-visible group/bot">
+              {/* Robot Container - Compact and always visible */}
+              <div className="scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
                 <Robot3D />
               </div>
             </div>
