@@ -319,6 +319,7 @@ body {
   --accent-emerald: #10b981;
   --accent-rose: #f43f5e;
   --current-accent: var(--accent-cyan);
+  --accent-glow: rgba(34, 211, 238, 0.3);
   --orb-color: var(--accent-cyan);
   --text-primary: #f0f4f8;
   --text-secondary: #7a94aa;

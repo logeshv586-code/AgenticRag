@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
 import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
+import ThemeSettings from './components/ThemeSettings';
 const RagAnalyticsDashboard = lazy(() => import('./components/RagAnalyticsDashboard'));
 
 const INITIAL_MESSAGES = [
@@ -110,27 +111,45 @@ function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [initialCreateConfig, setInitialCreateConfig] = useState(null);
   const [activeTheme, setActiveTheme] = useState('cyan');
-  const [ragConfig, setRagConfig] = useState({ themeHue: 0 });
+  const [ragConfig, setRagConfig] = useState({ themeHue: 190 });
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [metrics, setMetrics] = useState(null);
   const [logs, setLogs] = useState([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isThemeSettingsOpen, setIsThemeSettingsOpen] = useState(false);
+  const [themeHue, setThemeHue] = useState(() => {
+    const saved = localStorage.getItem('omnirag_theme_hue');
+    return saved ? parseInt(saved) : 190; // Default cyan hue
+  });
+
+  useEffect(() => {
+    localStorage.setItem('omnirag_theme_hue', themeHue);
+  }, [themeHue]);
 
   useEffect(() => {
     const root = document.documentElement;
-    const themes = {
-      cyan: { accent: '#00d2ff', bg: '#020508', orb: '#00d2ff', image: 'var(--bg-cyan-tint)' },
-      emerald: { accent: '#10b981', bg: '#010805', orb: '#10b981', image: 'var(--bg-emerald-tint)' },
-      purple: { accent: '#7c3aed', bg: '#050208', orb: '#7c3aed', image: 'var(--bg-purple-tint)' },
-      rose: { accent: '#f43f5e', bg: '#080204', orb: '#f43f5e', image: 'var(--bg-rose-tint)' }
-    };
 
+    // Generate theme colors based on hue
+    const accent = `hsl(${themeHue}, 100%, 50%)`;
+    const accentDark = `hsl(${themeHue}, 100%, 40%)`;
+    const accentGlow = `hsla(${themeHue}, 100%, 50%, 0.3)`;
+    const bgTint = `radial-gradient(circle at 50% 50%, hsl(${themeHue}, 30%, 5%) 0%, #020508 100%)`;
+
+    root.style.setProperty('--current-accent', accent);
+    root.style.setProperty('--accent-glow', accentGlow);
+    root.style.setProperty('--orb-color', accent);
+    root.style.setProperty('--bg-void-image', bgTint);
+
+    // Fallback for parts using legacy themes
+    const themes = {
+      cyan: { bg: '#020508' },
+      emerald: { bg: '#010805' },
+      purple: { bg: '#050208' },
+      rose: { bg: '#080204' }
+    };
     const theme = themes[activeTheme] || themes.cyan;
-    root.style.setProperty('--current-accent', theme.accent);
-    root.style.setProperty('--orb-color', theme.orb);
-    root.style.setProperty('--bg-void-image', theme.image);
     document.body.style.backgroundColor = theme.bg;
-  }, [activeTheme]);
+  }, [themeHue, activeTheme]);
 
   // Mouse move effect for glass panels
   useEffect(() => {
@@ -874,117 +893,136 @@ function App() {
                 </div>
               </div>
             </div>
-            <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white">
-              <ChevronDown className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsThemeSettingsOpen(!isThemeSettingsOpen)}
+                className={`p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
+              >
+                <Palette className="w-5 h-5" />
+              </button>
+              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white">
+                <ChevronDown className="w-6 h-6" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-premium">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end animate-user-message-in' : 'justify-start animate-message-in'}`}
-              >
-                {msg.role === 'user' ? (
-                  <div className="bg-gradient-to-br from-cyan-400 to-blue-500 text-black px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[14px] font-semibold leading-relaxed shadow-lg shadow-cyan-500/20">
-                    {msg.content}
-                  </div>
-                ) : (
-                  <div className="flex gap-4 max-w-[90%] animate-fade-in">
-                    <div className="w-10 h-10 flex-shrink-0">
-                      <div className="scale-[0.6] origin-top-left drop-shadow-lg" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
-                        <MiniRobot />
-                      </div>
-                    </div>
-                    <div className="flex flex-col gap-2">
-                      <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-white/10 text-zinc-200 text-[14px] leading-relaxed font-normal shadow-lg">
-                        {msg.content}
-                      </div>
-
-                      {msg.suggestions && (
-                        <div className="flex flex-col gap-2 mt-2 w-full max-w-[280px]">
-                          {msg.suggestions.map(s => (
-                            <button
-                              key={s.id}
-                              onClick={() => handleSuggestionClick(s.id)}
-                              className="px-4 py-2.5 text-sm text-left bg-black/40 border border-white/10 rounded-xl hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300 shadow-sm"
-                            >
-                              {s.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-1.5 mt-1 ml-1">
-                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                          <ThumbsUp className="w-4 h-4" />
-                        </button>
-                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                          <ThumbsDown className="w-4 h-4" />
-                        </button>
-                        <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          <div className="flex-1 overflow-hidden relative flex flex-col">
+            {isThemeSettingsOpen && (
+              <div className="absolute inset-x-0 top-0 z-20 bg-[#0b0b0e]/95 backdrop-blur-md border-b border-white/5 animate-slide-up">
+                <ThemeSettings
+                  currentHue={themeHue}
+                  onHueChange={setThemeHue}
+                  onClose={() => setIsThemeSettingsOpen(false)}
+                />
               </div>
-            ))}
-
-            {isLoading && (
-              <div className="flex justify-start animate-message-in">
-                <div className="flex gap-4 max-w-[90%] animate-fade-in">
-                  <div className="flex flex-col gap-2">
-                    <div className="bg-gradient-to-br from-black/60 to-black/80 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-cyan-500/20 shadow-xl shadow-cyan-500/10 flex items-center gap-5">
-                      <div className="scale-[0.6] origin-left" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
-                        <WaitingRobot />
+            )}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-premium">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.role === 'user' ? 'justify-end animate-user-message-in' : 'justify-start animate-message-in'}`}
+                >
+                  {msg.role === 'user' ? (
+                    <div className="bg-gradient-to-br from-cyan-400 to-blue-500 text-black px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[14px] font-semibold leading-relaxed shadow-lg shadow-cyan-500/20">
+                      {msg.content}
+                    </div>
+                  ) : (
+                    <div className="flex gap-4 max-w-[90%] animate-fade-in">
+                      <div className="w-10 h-10 flex-shrink-0">
+                        <div className="scale-[0.6] origin-top-left drop-shadow-lg" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+                          <MiniRobot />
+                        </div>
                       </div>
-                      <span className="text-cyan-400 font-medium text-sm tracking-wide animate-pulse">Computing Node Response...</span>
+                      <div className="flex flex-col gap-2">
+                        <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-white/10 text-zinc-200 text-[14px] leading-relaxed font-normal shadow-lg">
+                          {msg.content}
+                        </div>
+
+                        {msg.suggestions && (
+                          <div className="flex flex-col gap-2 mt-2 w-full max-w-[280px]">
+                            {msg.suggestions.map(s => (
+                              <button
+                                key={s.id}
+                                onClick={() => handleSuggestionClick(s.id)}
+                                className="px-4 py-2.5 text-sm text-left bg-black/40 border border-white/10 rounded-xl hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300 shadow-sm"
+                              >
+                                {s.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5 mt-1 ml-1">
+                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <ThumbsUp className="w-4 h-4" />
+                          </button>
+                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <ThumbsDown className="w-4 h-4" />
+                          </button>
+                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <Copy className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {isLoading && (
+                <div className="flex justify-start animate-message-in">
+                  <div className="flex gap-4 max-w-[90%] animate-fade-in">
+                    <div className="flex flex-col gap-2">
+                      <div className="bg-gradient-to-br from-black/60 to-black/80 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-cyan-500/20 shadow-xl shadow-cyan-500/10 flex items-center gap-5">
+                        <div className="scale-[0.6] origin-left" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+                          <WaitingRobot />
+                        </div>
+                        <span className="text-cyan-400 font-medium text-sm tracking-wide animate-pulse">Computing Node Response...</span>
+                      </div>
                     </div>
                   </div>
                 </div>
+              )}
+              <div ref={messagesEndRef} />
+            </div>
+
+            <div className="p-6 bg-black/20 backdrop-blur-xl border-t border-white/5">
+
+              {isListening && (
+                <div className="w-full h-8 mb-4 flex items-center justify-center gap-1.5">
+                  <div className="w-1 h-3 bg-cyan-400 animate-pulse rounded-full"></div>
+                  <div className="w-1 h-6 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '100ms' }}></div>
+                  <div className="w-1 h-4 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '200ms' }}></div>
+                  <div className="w-1 h-8 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '300ms' }}></div>
+                  <div className="w-1 h-5 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '400ms' }}></div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 bg-white/5 p-2 rounded-[30px] border border-white/10 focus-within:border-cyan-500/50 focus-within:bg-white/10 transition-all duration-300">
+                <button
+                  onClick={toggleListening}
+                  className={`p-3 rounded-full transition-all flex items-center justify-center ${isListening ? 'text-cyan-400 bg-cyan-400/10 scale-110' : 'text-zinc-500 hover:text-cyan-400 hover:bg-white/5'}`}
+                >
+                  <Mic className="w-5 h-5" strokeWidth={isListening ? 2 : 1.5} />
+                </button>
+
+                <input
+                  type="text"
+                  placeholder="Describe your architecture..."
+                  className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px] px-2"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                />
+
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!inputValue.trim()}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${inputValue.trim() ? 'bg-cyan-400 text-black hover:scale-105 active:scale-95 shadow-lg shadow-cyan-400/20 shrink-0' : 'bg-white/5 text-zinc-600 cursor-not-allowed shrink-0 rotate-90'}`}
+                >
+                  <Send className="w-5 h-5 ml-1" />
+                </button>
               </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          <div className="p-6 bg-black/20 backdrop-blur-xl border-t border-white/5">
-
-            {isListening && (
-              <div className="w-full h-8 mb-4 flex items-center justify-center gap-1.5">
-                <div className="w-1 h-3 bg-cyan-400 animate-pulse rounded-full"></div>
-                <div className="w-1 h-6 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '100ms' }}></div>
-                <div className="w-1 h-4 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '200ms' }}></div>
-                <div className="w-1 h-8 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '300ms' }}></div>
-                <div className="w-1 h-5 bg-cyan-400 animate-pulse rounded-full" style={{ animationDelay: '400ms' }}></div>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3 bg-white/5 p-2 rounded-[30px] border border-white/10 focus-within:border-cyan-500/50 focus-within:bg-white/10 transition-all duration-300">
-              <button
-                onClick={toggleListening}
-                className={`p-3 rounded-full transition-all flex items-center justify-center ${isListening ? 'text-cyan-400 bg-cyan-400/10 scale-110' : 'text-zinc-500 hover:text-cyan-400 hover:bg-white/5'}`}
-              >
-                <Mic className="w-5 h-5" strokeWidth={isListening ? 2 : 1.5} />
-              </button>
-
-              <input
-                type="text"
-                placeholder="Describe your architecture..."
-                className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px] px-2"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              />
-
-              <button
-                onClick={() => handleSend()}
-                disabled={!inputValue.trim()}
-                className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${inputValue.trim() ? 'bg-cyan-400 text-black hover:scale-105 active:scale-95 shadow-lg shadow-cyan-400/20 shrink-0' : 'bg-white/5 text-zinc-600 cursor-not-allowed shrink-0 rotate-90'}`}
-              >
-                <Send className="w-5 h-5 ml-1" />
-              </button>
             </div>
           </div>
         </div>
@@ -1002,7 +1040,7 @@ function App() {
           >
             <div className="relative w-[50px] h-[50px] flex items-center justify-center overflow-visible group/bot">
               {/* Robot Container - Compact and always visible */}
-              <div className="scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${ragConfig.themeHue}deg)` }}>
+              <div className="scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
                 <Robot3D />
               </div>
             </div>
