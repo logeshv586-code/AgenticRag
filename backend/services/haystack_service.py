@@ -280,15 +280,35 @@ def build_and_deploy_pipeline(config: dict) -> Tuple[str, Pipeline]:
 #  Query Execution
 # ═══════════════════════════════════════════════════════════
 
-def query_pipeline(pipeline_id: str, query: str, audio_base64: str = None) -> dict:
+def query_pipeline(pipeline_id: str, query: str, audio_base64: str = None, llm_override: dict = None) -> dict:
     """
     Runs a query through the deployed pipeline.
     Routes to specialized query executors for modular pipelines.
     Returns a dict with at minimum {"answer": str}.
+    
+    llm_override: Optional dict {"model": str, "api_key": str, "base_url": str}
+                  Lets users test with their own LLM instead of the platform default.
     """
     pipeline = active_pipelines.get(pipeline_id)
+    if not pipeline and llm_override:
+        # Build a fallback pipeline using the override LLM directly
+        return _query_with_override_llm(query, llm_override)
+
     if not pipeline:
         return {"answer": "Error: Pipeline not found or has been stopped."}
+
+    # If user provided an LLM override, swap the generator at query time
+    if llm_override:
+        try:
+            override_model = llm_override.get("model", "")
+            override_apikey = llm_override.get("api_key")
+            override_baseurl = llm_override.get("base_url")
+            new_generator = get_generator(override_model, api_key=override_apikey, base_url=override_baseurl)
+            # Swap the LLM component if it exists
+            if "llm" in [c[0] for c in pipeline.graph.nodes(data=True) if c]:
+                pipeline.get_component("llm").update_model(new_generator)
+        except Exception as e:
+            logger.warning(f"LLM override failed, using default: {e}")
 
     meta = pipeline_metadata.get(pipeline_id, {})
     rag_type = meta.get("rag_type", "basic")

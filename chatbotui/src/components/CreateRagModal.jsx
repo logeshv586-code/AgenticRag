@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bot, Link as LinkIcon, Upload, Database, LayoutTemplate, Palette, X, ChevronRight, Check, Settings2, Globe, Server, Code, Terminal, MessageSquare, Play, User, Layers, Shield, Eye, Zap, Languages, Mic, BookOpen, Key, Search, MessageCircle, Workflow, Brain, Cpu, Users, Book, Wand2, Cloud, HardDrive, Network } from 'lucide-react';
 import RagVisualizer from './RagVisualizer';
+import { API_BASE_URL } from '../config';
 
 const DB_TYPES = [
   { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.', icon: Cloud },
@@ -164,7 +165,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
       try {
         // Scrape Process
         if (validUrls.length > 0) {
-          await fetch('http://localhost:8000/api/ingest', {
+          await fetch(`${API_BASE_URL}/api/ingest`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -180,7 +181,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
           const formData = new FormData();
           formData.append('file', file);
           formData.append('ragName', config.ragName);
-          await fetch('http://localhost:8000/api/upload', {
+          await fetch(`${API_BASE_URL}/api/upload`, {
             method: 'POST',
             body: formData
           });
@@ -230,7 +231,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
 
     try {
       setDeployProgress(50);
-      const deployRes = await fetch('http://localhost:8000/api/deploy', {
+      const deployRes = await fetch(`${API_BASE_URL}/api/deploy`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,7 +1,7 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import os
 import logging
 from services.scraper import scrape_urls
@@ -12,7 +12,7 @@ from services.tuning_presets import apply_tuning_preset, list_presets, get_rag_d
 from services.security_middleware import SecurityMiddleware
 from services.observability_service import get_metrics, get_logs
 from services.deployment_manager import package_deployment
-import subprocess
+from services.document_parser import parse_document, get_supported_extensions
 import requests
 from contextlib import asynccontextmanager
 
@@ -20,39 +20,44 @@ from contextlib import asynccontextmanager
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# --- Local LLM Server Management ---
-MODEL_PATH = r"C:\Users\e629\Documents\AgenticRag\Qwen2.5-14B-Instruct-1M-Q3_K_L.gguf"
-LLM_PORT = 8001
-llm_process = None
+import time
 
-def start_llm_server():
-    global llm_process
-    logger.info(f"Starting local LLM server on port {LLM_PORT}...")
+# --- Local LLM Server Management (Ollama) ---
+OLLAMA_PORT = 11434
+OLLAMA_BASE_URL = f"http://localhost:{OLLAMA_PORT}"
+
+def check_ollama_status() -> dict:
+    """Check if Ollama is running and return available models."""
     try:
-        cmd = f'python -m llama_cpp.server --model "{MODEL_PATH}" --port {LLM_PORT} --host 0.0.0.0 --n_ctx 4096'
-        llm_process = subprocess.Popen(
-            cmd,
-            shell=True,
-            stdout=None,
-            stderr=None,
-            text=True
-        )
-        logger.info("LLM subprocess spawned.")
+        resp = requests.get(f"{OLLAMA_BASE_URL}/api/tags", timeout=5)
+        if resp.status_code == 200:
+            models = resp.json().get("models", [])
+            model_names = [m["name"] for m in models]
+            return {"running": True, "models": model_names}
+        return {"running": False, "models": [], "error": f"HTTP {resp.status_code}"}
     except Exception as e:
-        logger.error(f"Failed to start LLM server: {e}")
+        return {"running": False, "models": [], "error": str(e)}
 
-def stop_llm_server():
-    global llm_process
-    if llm_process:
-        logger.info("Stopping local LLM server...")
-        llm_process.terminate()
-        llm_process.wait()
+def get_best_ollama_model(models: list) -> str:
+    """Pick the best available model for text generation."""
+    priority = ["mixtral", "qwen2.5", "llama3.1", "llama3", "gemma3", "gemma2", "mistral", "phi3", "llama2"]
+    for preferred in priority:
+        for m in models:
+            if preferred in m.lower():
+                return m
+    return models[0] if models else "llama3.1:8b"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    start_llm_server()
+    status = check_ollama_status()
+    if status["running"]:
+        best = get_best_ollama_model(status["models"])
+        logger.info(f"✅ Ollama running. Available models: {status['models']}")
+        logger.info(f"🤖 Platform chatbot will use: {best}")
+    else:
+        logger.warning(f"⚠️  Ollama not detected: {status.get('error')}")
+        logger.warning("   Install from https://ollama.ai and run: ollama serve")
     yield
-    stop_llm_server()
 
 app = FastAPI(title="Agentic RAG Creator API", lifespan=lifespan)
 
@@ -85,6 +90,7 @@ class ChatRequest(BaseModel):
     query: str
     pipeline_id: Optional[str] = None
     audio_base64: Optional[str] = None  # For Voice RAG pipeline
+    llm_override: Optional[Dict[str, str]] = None  # {"model": "gpt-4o", "api_key": "sk-...", "base_url": "..."}
 
 class DeployRequest(BaseModel):
     ragName: str
@@ -210,49 +216,162 @@ async def api_supported_formats():
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
-    """Uses the local Qwen model to chat with the user and guide them on RAG creation."""
-    system_prompt = (
-        "You are an expert AI architect guiding a user to build a Custom RAG system. "
-        "Explain RAG concepts clearly and concisely. "
-        "Recommend components like Pinecone, ChromaDB, Haystack pipelines, etc."
-    )
+    """Powers the site chatbot robot with full OmniRAG platform knowledge via local Ollama LLM."""
+    system_prompt = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
+
+You know everything about the OmniRAG platform:
+
+## Platform Overview
+OmniRAG Engine is an enterprise-grade platform that lets anyone build production-ready AI chatbots backed by custom knowledge bases. Users upload their data (documents, images, audio, websites), choose a RAG architecture, and deploy a live AI endpoint — all without writing code.
+
+## 13 RAG Architecture Types You Can Build
+1. **Universal Neural RAG** — Vector search for precise text retrieval. Best for FAQs, knowledge bases.
+2. **Global Data Integration (Hybrid RAG)** — BM25 + dense vector search with Reciprocal Rank Fusion. Best for documentation, code search.
+3. **Enterprise Cognitive RAG (Conversational)** — Maintains session history and memory. Best for customer support, AI tutors.
+4. **Global Context RAG (Multimodal)** — Retrieve images, audio, and video alongside text. Best for media search, product catalogs.
+5. **Structured Intelligence RAG** — Text-to-SQL for structured/tabular data. Best for data analysis, financial reports.
+6. **Synaptic Graph RAG** — Reasoning across knowledge graphs and entity relationships. Best for legal, medical research.
+7. **Autonomous Network (Agentic RAG)** — Multi-step planning agents with tool use. Best for complex research, data pipelines.
+8. **Live Neural Stream (Realtime RAG)** — Streaming ingestion for fresh content. Best for news, ops alerts.
+9. **Adaptive Persona RAG** — Personalized retrieval using user profiles. Best for portals, learning platforms.
+10. **Universal Matrix (Multilingual RAG)** — Native support for 94+ languages. Best for global sites, multilingual support.
+11. **Vocal Synthesis (Voice RAG)** — Voice in/out with speech-to-text and text-to-speech. Best for hotlines, kiosks.
+12. **Verified Intelligence (Citation RAG)** — Always shows sources and references. Best for knowledge pages, audits.
+13. **Policy Guard Architecture (Guardrails RAG)** — Topic restrictions and safety compliance. Best for healthcare, enterprise.
+
+## How to Build a RAG (Step by Step)
+1. Click **Start Building** or **Deploy Assistant** button on the homepage.
+2. Choose a RAG type or assistant template.
+3. Enter your data sources — upload files (PDF, DOCX, CSV, HTML, images, audio) or paste URLs to scrape.
+4. Configure settings — chunk size, top-K retrieval, LLM model, embedding model, vector database.
+5. Click **Deploy** — your RAG is live in seconds with a unique pipeline ID.
+6. Test your RAG at the /chat/:pipelineId endpoint using the built-in chat interface.
+
+## Supported File Types for RAG Creation
+- **Documents**: PDF, DOCX, TXT, CSV, HTML, Markdown
+- **Images**: JPG, PNG, WEBP, BMP, TIFF (described by AI vision model)
+- **Audio**: MP3, WAV, M4A, OGG (transcribed by local Whisper AI)
+- **Websites**: Any URL — we scrape and index the content
+- **Multilingual**: Any language — auto-detected and translated for indexing
+
+## LLM Models Supported
+- **Local (your server)**: Ollama — LLaMA 3.1, Mixtral, Qwen2.5, LLaVA (vision), Gemma3
+- **Cloud APIs**: OpenAI GPT-4o, Anthropic Claude 3.5, Google Gemini Pro
+- Users can also provide their own API key when testing their deployed RAG
+
+## Vector Databases Supported
+- Local: ChromaDB, FAISS
+- Cloud: Pinecone, Qdrant, Elasticsearch
+
+## Key Features
+- Agentic reasoning with multi-step planning
+- Policy Guard for content compliance
+- Hybrid retrieval (BM25 + semantic)
+- Real-time streaming ingestion
+- Built-in observability dashboard (metrics, logs)
+- One-click deployment packaging (Docker/K8s)
+- Session memory for conversational RAGs
+- Citation mode (always shows sources)
+
+Answer questions helpfully and concisely. If asked to build or choose a RAG, guide the user step by step. Always be encouraging and practical."""
 
     try:
+        # Get available Ollama models and pick the best one
+        status = check_ollama_status()
+        if not status["running"]:
+            return {"answer": "The local AI engine is starting up. Please try again in a moment. (Ollama not detected — ensure it's running on port 11434)"}
+
+        best_model = get_best_ollama_model(status["models"])
+
         response = requests.post(
-            f"http://localhost:{LLM_PORT}/v1/chat/completions",
+            f"{OLLAMA_BASE_URL}/v1/chat/completions",
             json={
+                "model": best_model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": req.query}
                 ],
                 "temperature": 0.7,
-                "max_tokens": 512
+                "max_tokens": 1024
             },
             timeout=120
         )
         response.raise_for_status()
         data = response.json()
         answer = data["choices"][0]["message"]["content"]
-        return {"answer": answer}
+        return {"answer": answer, "model_used": best_model}
     except Exception as e:
         logger.warning(f"LLM Chat Error: {e}")
-        return {"answer": "I am currently initializing my local reasoning engine. Please try asking again in a few moments."}
+        return {"answer": "I am your OmniRAG Neural Assistant! I'm currently initializing. You can ask me about any of the 13 RAG types, how to build your first RAG, supported file types, or which architecture fits your use case. Please try again in a moment.", "model_used": "initializing"}
+
+
+@app.get("/api/ollama/status")
+async def api_ollama_status():
+    """Check Ollama server status and list available models."""
+    status = check_ollama_status()
+    best = get_best_ollama_model(status["models"]) if status["running"] and status["models"] else None
+    return {
+        "status": "running" if status["running"] else "offline",
+        "models": status.get("models", []),
+        "best_model": best,
+        "error": status.get("error"),
+        "ollama_url": OLLAMA_BASE_URL
+    }
+
+
+@app.post("/api/ollama/pull")
+async def api_ollama_pull(request: dict):
+    """Trigger an Ollama model pull. Body: {"model": "llama3.1:8b"}"""
+    import subprocess
+    model = request.get("model", "llama3.1:8b")
+    try:
+        # Run ollama pull in background
+        subprocess.Popen(["ollama", "pull", model], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return {"status": "pulling", "model": model, "message": f"Started pulling {model}. Check ollama status for progress."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @app.post("/api/test-chat")
 async def api_test_chat(req: ChatRequest):
-    """Query endpoint for deployed RAG pipelines. Supports text and audio input."""
+    """Query endpoint for deployed RAG pipelines. Supports text, audio, and LLM override."""
     if not req.pipeline_id:
         return {"answer": "Error: No pipeline_id provided."}
 
     logger.info(f"Executing test chat for pipeline {req.pipeline_id} with query: {req.query}")
-    result = query_pipeline(req.pipeline_id, req.query, audio_base64=req.audio_base64)
+    result = query_pipeline(
+        req.pipeline_id,
+        req.query,
+        audio_base64=req.audio_base64,
+        llm_override=req.llm_override
+    )
 
-    # result is now a dict: {"answer": str, optional: "audio_response", "text_query"}
     if isinstance(result, dict):
         return result
-    # Backward compatibility
     return {"answer": result}
+
+
+@app.post("/transcribe")
+async def api_transcribe(file: UploadFile = File(...)):
+    """Transcribe an audio file to text using local Whisper (faster-whisper)."""
+    temp_path = None
+    try:
+        import tempfile
+        suffix = os.path.splitext(file.filename)[1] if file.filename else ".webm"
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            temp_path = tmp.name
+            content = await file.read()
+            tmp.write(content)
+
+        from services.document_parser import _transcribe_audio
+        text = _transcribe_audio(temp_path)
+        return {"text": text, "filename": file.filename}
+    except Exception as e:
+        logger.error(f"Transcription error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 
 
 # ═══════════════════════════════════════════════════════════

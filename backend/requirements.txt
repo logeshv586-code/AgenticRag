@@ -26,12 +26,13 @@ langdetect
 deep-translator
 edge-tts
 networkx
-# faster-whisper  # Optional: local STT (requires separate install)
-# pyttsx3         # Optional: local TTS fallback
-# spacy           # Optional: entity extraction for Graph RAG
-# neo4j           # Optional: cloud graph store
+# === Multimodal Support ===
+faster-whisper          # Local Whisper STT (audio transcription, no cloud)
+pydub                   # Audio format conversion (mp3/m4a/ogg → wav)
+SpeechRecognition       # Audio helpers
+# openai-whisper        # Alternative Whisper backend (larger, slower)
 # === Phase 2: Database Layer ===
 # pgvector-haystack  # Optional: PGVector integration
 # redis-haystack     # Optional: Redis vector search
 # === Phase 3: Model Layer ===
-# ollama             # Optional: Ollama integration (install via ollama.ai)
+# ollama             # Managed via ollama.ai (install separately)

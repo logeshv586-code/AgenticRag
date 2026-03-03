@@ -2,7 +2,7 @@ import requests
 import json
 import time
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8010"
 URLS = ["https://eratimbers.com/"]
 DB_TYPE = "local"
 LOCAL_DB = "chroma"

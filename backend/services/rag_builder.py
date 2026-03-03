@@ -25,7 +25,7 @@ def deploy_rag_system(config: dict) -> Dict:
     deployment_type = config.get("deploymentType", "api")
     pipeline_id, pipeline = build_and_deploy_pipeline(config)
 
-    endpoint = f"http://localhost:8000/api/test-chat"
+    endpoint = f"http://localhost:8010/api/test-chat"
 
     response = {
         "pipeline_id": pipeline_id,
@@ -111,7 +111,7 @@ with open("pipeline_config.json") as f:
 
 print(f"Pipeline Type: {{config['rag_type']}}")
 print(f"LLM: {{config['llm_model']}}")
-print(f"Ready for queries on port 8000")
+print(f"Ready for queries on port 8010")
 """
     script_path = os.path.join(package_dir, "run.py")
     with open(script_path, 'w') as f:

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, ThumbsUp, ThumbsDown, User, Bot, Loader2 } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function RagChatTester({ themeColor, themeName }) {
     const [messages, setMessages] = useState([{ role: 'bot', content: 'Hello! Your custom RAG is deployed and ready. Try asking me a question!' }]);
@@ -25,7 +26,7 @@ export default function RagChatTester({ themeColor, themeName }) {
         setIsLoading(true);
 
         try {
-            const res = await fetch('http://localhost:8000/api/test-chat', {
+            const res = await fetch(`${API_BASE_URL}/api/test-chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: userMessage })
@@ -46,7 +47,7 @@ export default function RagChatTester({ themeColor, themeName }) {
 
     const submitFeedback = async (rating) => {
         try {
-            await fetch('http://localhost:8000/api/feedback', {
+            await fetch(`${API_BASE_URL}/api/feedback`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: 'test_session', rating, comment: '' })

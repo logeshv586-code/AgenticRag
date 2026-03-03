@@ -44,13 +44,13 @@ COPY . .
 ENV PIPELINE_ID={pipeline_id}
 ENV RAG_TYPE={config.get('ragType', 'basic')}
 ENV HOST=0.0.0.0
-ENV PORT=8000
+ENV PORT=8010
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8010
 
 # Run the API
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8010"]
 """
     with open(os.path.join(target_dir, "Dockerfile"), "w") as f:
         f.write(dockerfile)
@@ -62,7 +62,7 @@ CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
     services = {
         "api": {
             "build": ".",
-            "ports": ["8000:8000"],
+            "ports": ["8010:8010"],
             "volumes": ["./data:/app/data"],
             "environment": [
                 f"PIPELINE_ID={pipeline_id}",
@@ -116,7 +116,7 @@ def _create_k8s_package(pipeline_id: str, config: dict, target_dir: str):
                     "containers": [{
                         "name": "api",
                         "image": f"my-registry/rag-api:{pipeline_id.lower()}",
-                        "ports": [{"containerPort": 8000}],
+                        "ports": [{"containerPort": 8010}],
                         "env": [
                             {"name": "PIPELINE_ID", "value": pipeline_id},
                             {"name": "RAG_TYPE", "value": config.get('ragType', 'basic')}
@@ -139,7 +139,7 @@ def _create_k8s_package(pipeline_id: str, config: dict, target_dir: str):
         },
         "spec": {
             "selector": {"app": "rag-api"},
-            "ports": [{"port": 80, "targetPort": 8000}],
+            "ports": [{"port": 80, "targetPort": 8010}],
             "type": "LoadBalancer"
         }
     }

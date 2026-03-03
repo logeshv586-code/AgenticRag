@@ -68,51 +68,109 @@ def detect_gpu_availability() -> dict:
 # ═══════════════════════════════════════════════════════════
 
 MODEL_CAPABILITIES = {
+    # ─── Local via Ollama (30-40GB server models) ──────────────────────────
+    "ollama-auto": {
+        "display_name": "Ollama Auto (Best Available)",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": True,
+        "context_window": 32768,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "auto",
+    },
+    "mixtral:8x7b": {
+        "display_name": "Mixtral 8x7B (26GB) — Best All-Round",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 32768,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "26GB",
+    },
+    "qwen2.5:72b": {
+        "display_name": "Qwen 2.5 72B (44GB) — Best Multilingual",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 32768,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "44GB",
+    },
+    "llama3.1:70b": {
+        "display_name": "LLaMA 3.1 70B Q2 (26GB) — Deep Reasoning",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 131072,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "26GB",
+    },
+    "llava:34b": {
+        "display_name": "LLaVA 34B (20GB) — Vision + Text",
+        "type": "local",
+        "supports_tools": False,
+        "supports_vision": True,
+        "context_window": 8192,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "20GB",
+    },
+    "gemma3:27b": {
+        "display_name": "Gemma 3 27B (17GB) — Multimodal",
+        "type": "local",
+        "supports_tools": False,
+        "supports_vision": True,
+        "context_window": 8192,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "17GB",
+    },
+    "llama3.1:8b": {
+        "display_name": "LLaMA 3.1 8B (5GB) — Fast / Lightweight",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 131072,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+        "model_size": "5GB",
+    },
+    # ─── Legacy llama_cpp local models (kept for backward compatibility) ───
     "qwen-local": {
-        "display_name": "Local Qwen 2.5 14B",
+        "display_name": "Qwen 2.5 14B (local .gguf)",
         "type": "local",
         "supports_tools": False,
         "supports_vision": False,
         "context_window": 4096,
         "requires_gpu": False,
         "min_vram_mb": 6000,
+        "model_size": "8GB",
     },
     "mistral-local": {
-        "display_name": "Local Mistral 7B",
+        "display_name": "Mistral 7B (local .gguf)",
         "type": "local",
         "supports_tools": False,
         "supports_vision": False,
         "context_window": 4096,
         "requires_gpu": False,
         "min_vram_mb": 4000,
-    },
-    "llama3-local": {
-        "display_name": "Local Llama 3 8B",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": False,
-        "context_window": 8192,
-        "requires_gpu": False,
-        "min_vram_mb": 5000,
-    },
-    "deepseek-local": {
-        "display_name": "Local DeepSeek R1 7B",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": False,
-        "context_window": 4096,
-        "requires_gpu": False,
-        "min_vram_mb": 4000,
+        "model_size": "4GB",
     },
     "ollama": {
-        "display_name": "Ollama (Auto)",
+        "display_name": "Ollama (Auto-detect)",
         "type": "local",
         "supports_tools": True,
         "supports_vision": True,
         "context_window": 8192,
         "requires_gpu": False,
         "min_vram_mb": 0,
+        "model_size": "auto",
     },
+    # ─── Cloud Models ──────────────────────────────────────────────────────
     "gpt4o": {
         "display_name": "OpenAI GPT-4o",
         "type": "cloud",
@@ -206,21 +264,37 @@ def get_fallback_model(model_id: str) -> Optional[str]:
 #  Generator Factory
 # ═══════════════════════════════════════════════════════════
 
-def get_generator(model_id: str, api_key: Optional[str] = None):
+def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
     """
     Factory: return the right Haystack generator based on user selection.
-    Includes automatic fallback if the primary model is unavailable.
+    Supports llm_override via api_key + base_url for user-provided LLMs.
     """
-    if model_id == "qwen-local":
-        return _local_qwen_generator()
-    elif model_id == "mistral-local":
-        return _local_mistral_generator()
-    elif model_id == "llama3-local":
-        return _local_llama3_generator()
-    elif model_id == "deepseek-local":
-        return _local_deepseek_generator()
-    elif model_id == "ollama":
-        return _ollama_generator(api_key)
+    # If user provided a custom base_url, route to that OpenAI-compatible endpoint
+    if base_url:
+        from haystack.components.generators import OpenAIGenerator
+        key = Secret.from_token(api_key) if api_key else Secret.from_token("sk-no-key")
+        return OpenAIGenerator(
+            api_key=key,
+            api_base_url=base_url,
+            model=model_id,
+            generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+            timeout=300.0,
+        )
+
+    # Ollama-managed models (30-40GB range)
+    ollama_models = ["mixtral", "qwen2.5", "llama3.1", "llava", "gemma3", "llama3", "mistral", "phi3"]
+    is_ollama = any(m in model_id.lower() for m in ollama_models) or ":" in model_id
+
+    if model_id in ("ollama", "ollama-auto") or is_ollama:
+        return _ollama_generator(api_key, preferred_model=model_id if ":" in model_id else None)
+    elif model_id == "qwen-local":
+        return _ollama_generator(api_key, preferred_model="qwen2.5")
+    elif model_id in ("mistral-local",):
+        return _ollama_generator(api_key, preferred_model="mistral")
+    elif model_id in ("llama3-local",):
+        return _ollama_generator(api_key, preferred_model="llama3")
+    elif model_id in ("deepseek-local",):
+        return _ollama_generator(api_key, preferred_model="deepseek")
     elif model_id == "gpt4o":
         return _openai_generator(api_key)
     elif model_id == "claude35":
@@ -228,8 +302,8 @@ def get_generator(model_id: str, api_key: Optional[str] = None):
     elif model_id == "gemini":
         return _gemini_generator(api_key)
     else:
-        logger.warning(f"Unknown LLM model '{model_id}', falling back to local Qwen")
-        return _local_qwen_generator()
+        logger.warning(f"Unknown LLM model '{model_id}', falling back to Ollama auto")
+        return _ollama_generator(api_key)
 
 
 def get_model_display_name(model_id: str) -> str:
@@ -319,33 +393,47 @@ def _check_ollama_running() -> tuple:
         return False, "Ollama is not running. Start with: ollama serve"
 
 
-def _ollama_generator(api_key: Optional[str] = None):
+def _ollama_generator(api_key: Optional[str] = None, preferred_model: Optional[str] = None):
     """
     Ollama integration via OpenAI-compatible API.
-    Ollama exposes an OpenAI-compatible endpoint at /v1.
+    Auto-selects the best available model from the running Ollama instance.
+    Prefers large models (mixtral, qwen2.5, llama3.1) when available.
     """
     from haystack.components.generators import OpenAIGenerator
 
-    # Determine which model to use
-    model_name = "llama3"  # default
+    # Priority order: largest/best models first
+    model_priority = ["mixtral", "qwen2.5", "llama3.1", "llama3", "gemma3", "gemma2", "mistral", "phi3", "llama2", "deepseek"]
+
+    model_name = preferred_model or "llama3.1:8b"  # default fallback
     try:
         import requests
         resp = requests.get(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=3)
         if resp.status_code == 200:
             models = resp.json().get("models", [])
             if models:
-                # Prefer llama3, then mistral, then whatever is available
                 model_names = [m["name"] for m in models]
-                for preferred in ["llama3", "mistral", "qwen2.5"]:
-                    matching = [n for n in model_names if preferred in n.lower()]
-                    if matching:
-                        model_name = matching[0]
-                        break
-                else:
-                    model_name = model_names[0]
+
+                # If specific model requested, use it if available
+                if preferred_model and ":" in preferred_model:
+                    if any(preferred_model in n for n in model_names):
+                        model_name = preferred_model
+                    else:
+                        # Fall through to priority selection
+                        preferred_model = None
+
+                if not preferred_model or ":" not in str(preferred_model):
+                    # Auto-select best model by priority
+                    for preferred in (model_priority if not preferred_model else [preferred_model] + model_priority):
+                        matching = [n for n in model_names if preferred in n.lower()]
+                        if matching:
+                            model_name = matching[0]
+                            break
+                    else:
+                        model_name = model_names[0]
+
             logger.info(f"Ollama: Using model '{model_name}'")
     except Exception:
-        logger.warning("Could not query Ollama for models, using default 'llama3'")
+        logger.warning(f"Could not query Ollama, using default '{model_name}'")
 
     return OpenAIGenerator(
         api_key=Secret.from_token("ollama"),

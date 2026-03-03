@@ -7,6 +7,7 @@ import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
 import ThemeSettings from './components/ThemeSettings';
+import { API_BASE_URL } from './config';
 const RagAnalyticsDashboard = lazy(() => import('./components/RagAnalyticsDashboard'));
 
 const INITIAL_MESSAGES = [
@@ -250,7 +251,7 @@ function App() {
     const fd = new FormData();
     fd.append('file', blob, 'speech.webm');
     try {
-      const resp = await fetch('http://localhost:8000/transcribe', { method: 'POST', body: fd });
+      const resp = await fetch(`${API_BASE_URL}/transcribe`, { method: 'POST', body: fd });
       if (!resp.ok) throw new Error('fail');
       const data = await resp.json();
       const t = (data && data.text) || '';
@@ -331,7 +332,7 @@ function App() {
     setInputValue('');
     setIsLoading(true);
     try {
-      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || 'http://localhost:8000/api/test-chat';
+      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || `${API_BASE_URL}/api/test-chat`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -371,7 +372,7 @@ function App() {
       setMessages(prev => [...prev, userMsg]);
       setIsLoading(true);
       try {
-        const response = await fetch('http://localhost:8000/api/demo/eratimbers', { method: 'POST' });
+        const response = await fetch(`${API_BASE_URL}/api/demo/eratimbers`, { method: 'POST' });
         if (!response.ok) throw new Error('Demo failed');
         const data = await response.json();
 

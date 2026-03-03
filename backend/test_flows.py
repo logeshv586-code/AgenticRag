@@ -3,7 +3,7 @@ import json
 import time
 import sys
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8010"
 
 def log(msg):
     print(f"[*] {msg}")
