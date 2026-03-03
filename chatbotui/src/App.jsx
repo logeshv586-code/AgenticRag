@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
 import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
@@ -6,7 +6,7 @@ import WaitingRobot from './components/WaitingRobot';
 import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
-import RagAnalyticsDashboard from './components/RagAnalyticsDashboard';
+const RagAnalyticsDashboard = lazy(() => import('./components/RagAnalyticsDashboard'));
 
 const INITIAL_MESSAGES = [
   {
@@ -509,7 +509,16 @@ function App() {
 
         {/* Dynamic Analytics Dashboard - Moved Up for Visibility */}
         <section id="observability" className="mb-40 relative z-20">
-          <RagAnalyticsDashboard />
+          <Suspense fallback={
+            <div className="w-full bg-[#0b0b0e] border border-white/5 rounded-[40px] p-8 glass-card shadow-2xl relative overflow-hidden min-h-[600px] flex items-center justify-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-cyan-500/20 border-t-cyan-500 rounded-full animate-spin" />
+                <span className="text-zinc-500 font-bold text-xs uppercase tracking-widest animate-pulse">Loading Neural Analytics...</span>
+              </div>
+            </div>
+          }>
+            <RagAnalyticsDashboard />
+          </Suspense>
         </section>
 
         {/* Advanced Feature: Architecture Flow */}
