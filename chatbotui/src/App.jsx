@@ -7,6 +7,7 @@ import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
 import ThemeSettings from './components/ThemeSettings';
+import LegalModal from './components/LegalModal';
 import { API_BASE_URL } from './config';
 const RagAnalyticsDashboard = lazy(() => import('./components/RagAnalyticsDashboard'));
 
@@ -65,27 +66,40 @@ function App() {
   }, []);
 
   const handleDragStart = (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
+    const isTouch = e.type === 'touchstart';
+    if (!isTouch && e.button !== 0) return;
+
+    // e.preventDefault(); // Remove to allow click
     setHasMoved(false);
     setIsDragging(true);
 
+    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+
     dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       initialX: position.x,
       initialY: position.y
     };
 
     const onMove = (moveEvent) => {
-      if (Math.abs(moveEvent.clientX - dragRef.current.startX) > 3 || Math.abs(moveEvent.clientY - dragRef.current.startY) > 3) {
+      const currentX = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const currentY = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientY : moveEvent.clientY;
+
+      if (Math.abs(currentX - dragRef.current.startX) > 3 || Math.abs(currentY - dragRef.current.startY) > 3) {
         setHasMoved(true);
+        if (moveEvent.type === 'touchmove') moveEvent.preventDefault(); // Prevent scrolling while dragging
       }
-      let newX = dragRef.current.initialX + (moveEvent.clientX - dragRef.current.startX);
-      let newY = dragRef.current.initialY + (moveEvent.clientY - dragRef.current.startY);
+
+      let newX = dragRef.current.initialX + (currentX - dragRef.current.startX);
+      let newY = dragRef.current.initialY + (currentY - dragRef.current.startY);
+
       const padding = 20;
-      const elementWidth = 80 + padding;
-      const elementHeight = 80 + padding;
+      const isMobile = window.innerWidth < 768;
+      const elementWidth = (isMobile ? 40 : 80) + padding;
+      const elementHeight = (isMobile ? 40 : 80) + padding;
+
       newX = Math.max(padding, Math.min(newX, window.innerWidth - elementWidth));
       newY = Math.max(padding, Math.min(newY, window.innerHeight - elementHeight));
       setPosition({ x: newX, y: newY });
@@ -95,10 +109,17 @@ function App() {
       setIsDragging(false);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    if (isTouch) {
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onUp);
+    } else {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
   };
 
   const messagesEndRef = useRef(null);
@@ -122,6 +143,7 @@ function App() {
     const saved = localStorage.getItem('omnirag_theme_hue');
     return saved ? parseInt(saved) : 190; // Default cyan hue
   });
+  const [legalModalType, setLegalModalType] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('omnirag_theme_hue', themeHue);
@@ -790,12 +812,12 @@ function App() {
         </section>
 
         <footer className="ent-footer">
-          <div className="ent-footer-logo">AI Platform</div>
-          <div className="ent-footer-copy">© 2026 Enterprise AI. All rights reserved.</div>
+          <div className="ent-footer-logo">omniragengine</div>
+          <div className="ent-footer-copy">© 2026 Omniragengine. All rights reserved.</div>
           <div className="flex gap-6">
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Privacy</a>
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Terms</a>
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Contact</a>
+            <button onClick={() => setLegalModalType('privacy')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Privacy</button>
+            <button onClick={() => setLegalModalType('terms')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Terms</button>
+            <button onClick={() => setLegalModalType('contact')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Contact</button>
           </div>
         </footer>
       </main>
@@ -879,9 +901,9 @@ function App() {
       }
 
       <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 right-0 sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
-        <div className="w-screen sm:w-[420px] h-[100dvh] sm:h-[650px] glass-panel sm:rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
+        <div className="w-screen sm:w-[420px] h-[75dvh] sm:h-[650px] glass-panel mobile-chat-window sm:rounded-[40px] rounded-t-[30px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
-          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5 mobile-chat-header">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20">
                 <Bot className="w-7 h-7" />
@@ -1035,13 +1057,14 @@ function App() {
             className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
             style={{ left: position.x, top: position.y }}
             onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
             onClick={() => {
               if (!hasMoved) setIsOpen(true);
             }}
           >
-            <div className="relative w-[50px] h-[50px] flex items-center justify-center overflow-visible group/bot">
+            <div className="relative w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] flex items-center justify-center overflow-visible group/bot">
               {/* Robot Container - Compact and always visible */}
-              <div className="scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+              <div className="scale-[0.5] sm:scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
                 <Robot3D />
               </div>
             </div>
@@ -1120,6 +1143,12 @@ function App() {
           setMessages([msg]);
           setIsOpen(true);
         }}
+      />
+
+      <LegalModal
+        isOpen={!!legalModalType}
+        onClose={() => setLegalModalType(null)}
+        type={legalModalType}
       />
     </div >
   );
