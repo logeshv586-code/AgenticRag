@@ -37,20 +37,18 @@ function App() {
   const [hasMoved, setHasMoved] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
+  const isDragAction = useRef(false);
 
   const handleDragStart = (e) => {
-    const isMobile = window.innerWidth < 768;
-    if (isMobile) return; // Disable dragging on mobile to prevent accidental scrolls
-
     const isTouch = e.type === 'touchstart';
     if (!isTouch && e.button !== 0) return;
 
     setIsDragging(true);
+    isDragAction.current = false; // Reset drag action tracking
 
     const clientX = isTouch ? e.touches[0].clientX : e.clientX;
     const clientY = isTouch ? e.touches[0].clientY : e.clientY;
 
-    // Use current absolute position if already moved, else calculate from current DOM rect
     let startPosX = position.x;
     let startPosY = position.y;
     
@@ -72,8 +70,10 @@ function App() {
       const currentX = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientX : moveEvent.clientX;
       const currentY = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientY : moveEvent.clientY;
 
-      if (Math.abs(currentX - dragRef.current.startX) > 3 || Math.abs(currentY - dragRef.current.startY) > 3) {
+      // Allow 15px of jitter for fat fingers on mobile before classifying it as a drag
+      if (Math.abs(currentX - dragRef.current.startX) > 15 || Math.abs(currentY - dragRef.current.startY) > 15) {
         setHasMoved(true);
+        isDragAction.current = true;
         if (moveEvent.type === 'touchmove') moveEvent.preventDefault();
       }
 
@@ -89,12 +89,17 @@ function App() {
       setPosition({ x: newX, y: newY });
     };
 
-    const onUp = () => {
+    const onUp = (upEvent) => {
       setIsDragging(false);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       document.removeEventListener('touchmove', onMove);
       document.removeEventListener('touchend', onUp);
+
+      // If it wasn't a drag, it was a click!
+      if (!isDragAction.current) {
+         setIsOpen(prev => !prev);
+      }
     };
 
     if (isTouch) {
@@ -887,28 +892,28 @@ function App() {
       <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 left-0 right-0 sm:left-auto sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
         <div className="w-full sm:w-[420px] h-[75dvh] sm:h-[650px] glass-panel mobile-chat-window sm:rounded-[40px] rounded-t-[30px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
-          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5 mobile-chat-header">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20">
-                <Bot className="w-7 h-7" />
+          <div className="p-4 sm:p-6 border-b border-white/5 flex items-center justify-between bg-white/5 mobile-chat-header">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20 shrink-0">
+                <Bot className="w-6 h-6 sm:w-7 sm:h-7" />
               </div>
-              <div>
-                <h4 className="font-bold text-white tracking-wide">Neural Assistant</h4>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
-                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Node Active</span>
+              <div className="min-w-0">
+                <h4 className="font-bold text-white tracking-wide text-[15px] sm:text-base leading-tight truncate">Neural Assistant</h4>
+                <div className="flex items-center gap-1.5 sm:gap-2 mt-0.5">
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e] shrink-0"></span>
+                  <span className="text-[9px] sm:text-[10px] uppercase font-bold text-zinc-400 tracking-wider truncate">Node Active</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => setIsThemeSettingsOpen(!isThemeSettingsOpen)}
-                className={`p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
+                className={`p-1.5 sm:p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
               >
-                <Palette className="w-5 h-5" />
+                <Palette className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
-              <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white">
-                <ChevronDown className="w-6 h-6" />
+              <button onClick={() => setIsOpen(false)} className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white">
+                <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
           </div>
@@ -923,25 +928,25 @@ function App() {
                 />
               </div>
             )}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-premium">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 scrollbar-premium">
               {messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={`flex ${msg.role === 'user' ? 'justify-end animate-user-message-in' : 'justify-start animate-message-in'}`}
                 >
                   {msg.role === 'user' ? (
-                    <div className="bg-gradient-to-br from-cyan-400 to-blue-500 text-black px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[14px] font-semibold leading-relaxed shadow-lg shadow-cyan-500/20">
+                    <div className="bg-gradient-to-br from-cyan-400 to-blue-500 text-black px-4 py-2 sm:px-5 sm:py-3 rounded-2xl rounded-tr-sm max-w-[85%] text-[13px] sm:text-[14px] font-semibold leading-relaxed shadow-lg shadow-cyan-500/20 break-words">
                       {msg.content}
                     </div>
                   ) : (
-                    <div className="flex gap-4 max-w-[90%] animate-fade-in">
-                      <div className="w-10 h-10 flex-shrink-0">
-                        <div className="scale-[0.6] origin-top-left drop-shadow-lg" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+                    <div className="flex gap-3 sm:gap-4 max-w-[95%] sm:max-w-[90%] animate-fade-in w-full">
+                      <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
+                        <div className="scale-[0.5] sm:scale-[0.6] origin-top-left drop-shadow-lg" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
                           <MiniRobot />
                         </div>
                       </div>
-                      <div className="flex flex-col gap-2">
-                        <div className="bg-white/5 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-white/10 text-zinc-200 text-[14px] leading-relaxed font-normal shadow-lg">
+                      <div className="flex flex-col gap-2 min-w-0 flex-1">
+                        <div className="bg-white/5 backdrop-blur-md p-3 sm:p-4 rounded-2xl rounded-tl-sm border border-white/10 text-zinc-200 text-[13px] sm:text-[14px] leading-relaxed font-normal shadow-lg break-words w-fit">
                           {msg.content}
                         </div>
 
@@ -951,7 +956,7 @@ function App() {
                               <button
                                 key={s.id}
                                 onClick={() => handleSuggestionClick(s.id)}
-                                className="px-4 py-2.5 text-sm text-left bg-black/40 border border-white/10 rounded-xl hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300 shadow-sm"
+                                className="px-3 py-2 sm:px-4 sm:py-2.5 text-[12px] sm:text-sm text-left bg-black/40 border border-white/10 rounded-xl hover:bg-white/10 hover:border-cyan-500/50 hover:text-cyan-400 transition-all text-zinc-300 shadow-sm"
                               >
                                 {s.label}
                               </button>
@@ -959,15 +964,15 @@ function App() {
                           </div>
                         )}
 
-                        <div className="flex items-center gap-1.5 mt-1 ml-1">
-                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                            <ThumbsUp className="w-4 h-4" />
+                        <div className="flex items-center gap-1.5 mt-1 ml-1 shrink-0">
+                          <button className="p-1 sm:p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <ThumbsUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
-                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                            <ThumbsDown className="w-4 h-4" />
+                          <button className="p-1 sm:p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <ThumbsDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
-                          <button className="p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
-                            <Copy className="w-4 h-4" />
+                          <button className="p-1 sm:p-1.5 rounded-full hover:bg-white/10 transition text-zinc-500 hover:text-white">
+                            <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       </div>
@@ -978,13 +983,13 @@ function App() {
 
               {isLoading && (
                 <div className="flex justify-start animate-message-in">
-                  <div className="flex gap-4 max-w-[90%] animate-fade-in">
-                    <div className="flex flex-col gap-2">
-                      <div className="bg-gradient-to-br from-black/60 to-black/80 backdrop-blur-md p-4 rounded-2xl rounded-tl-sm border border-cyan-500/20 shadow-xl shadow-cyan-500/10 flex items-center gap-5">
-                        <div className="scale-[0.6] origin-left" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+                  <div className="flex gap-3 sm:gap-4 max-w-[90%] animate-fade-in w-full">
+                    <div className="flex flex-col gap-2 min-w-0">
+                      <div className="bg-gradient-to-br from-black/60 to-black/80 backdrop-blur-md p-3 sm:p-4 rounded-2xl rounded-tl-sm border border-cyan-500/20 shadow-xl shadow-cyan-500/10 flex items-center gap-3 sm:gap-5 w-fit">
+                        <div className="scale-[0.5] sm:scale-[0.6] origin-left shrink-0" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
                           <WaitingRobot />
                         </div>
-                        <span className="text-cyan-400 font-medium text-sm tracking-wide animate-pulse">Computing Node Response...</span>
+                        <span className="text-cyan-400 font-medium text-[12px] sm:text-sm tracking-wide animate-pulse truncate">Computing Response...</span>
                       </div>
                     </div>
                   </div>
@@ -993,7 +998,7 @@ function App() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-6 bg-black/20 backdrop-blur-xl border-t border-white/5">
+            <div className="p-4 sm:p-6 bg-black/20 backdrop-blur-xl border-t border-white/5 shrink-0">
 
               {isListening && (
                 <div className="w-full h-8 mb-4 flex items-center justify-center gap-1.5">
@@ -1005,18 +1010,18 @@ function App() {
                 </div>
               )}
 
-              <div className="flex items-center gap-3 bg-white/5 p-2 rounded-[30px] border border-white/10 focus-within:border-cyan-500/50 focus-within:bg-white/10 transition-all duration-300">
+              <div className="flex items-center gap-2 sm:gap-3 bg-white/5 p-1.5 sm:p-2 rounded-[30px] border border-white/10 focus-within:border-cyan-500/50 focus-within:bg-white/10 transition-all duration-300">
                 <button
                   onClick={toggleListening}
-                  className={`p-3 rounded-full transition-all flex items-center justify-center ${isListening ? 'text-cyan-400 bg-cyan-400/10 scale-110' : 'text-zinc-500 hover:text-cyan-400 hover:bg-white/5'}`}
+                  className={`p-2 sm:p-3 rounded-full transition-all flex items-center justify-center shrink-0 ${isListening ? 'text-cyan-400 bg-cyan-400/10 scale-110' : 'text-zinc-500 hover:text-cyan-400 hover:bg-white/5'}`}
                 >
-                  <Mic className="w-5 h-5" strokeWidth={isListening ? 2 : 1.5} />
+                  <Mic className="w-4 h-4 sm:w-5 sm:h-5" strokeWidth={isListening ? 2 : 1.5} />
                 </button>
 
                 <input
                   type="text"
                   placeholder="Describe your architecture..."
-                  className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[14px] px-2"
+                  className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-[13px] sm:text-[14px] px-1 sm:px-2 min-w-0"
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
@@ -1025,9 +1030,9 @@ function App() {
                 <button
                   onClick={() => handleSend()}
                   disabled={!inputValue.trim()}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 ${inputValue.trim() ? 'bg-cyan-400 text-black hover:scale-105 active:scale-95 shadow-lg shadow-cyan-400/20 shrink-0' : 'bg-white/5 text-zinc-600 cursor-not-allowed shrink-0 rotate-90'}`}
+                  className={`w-9 h-9 sm:w-11 sm:h-11 rounded-full flex items-center justify-center transition-all duration-300 shrink-0 ${inputValue.trim() ? 'bg-cyan-400 text-black hover:scale-105 active:scale-95 shadow-lg shadow-cyan-400/20' : 'bg-white/5 text-zinc-600 cursor-not-allowed rotate-90'}`}
                 >
-                  <Send className="w-5 h-5 ml-1" />
+                  <Send className="w-4 h-4 sm:w-5 sm:h-5 ml-1" />
                 </button>
               </div>
             </div>
@@ -1040,9 +1045,6 @@ function App() {
         style={hasMoved ? { left: position.x, top: position.y } : { bottom: '30px', right: '30px' }}
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
-            onClick={() => {
-              if (!hasMoved) setIsOpen(true);
-            }}
           >
             <div className="relative w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] flex items-center justify-center overflow-visible group/bot">
               {/* Robot Container - Compact and always visible */}

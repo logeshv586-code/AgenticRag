@@ -323,12 +323,17 @@
   --bg-rose-tint: radial-gradient(circle at 50% 50%, #1a040a 0%, #020508 100%);
 }
 
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
 body {
   margin: 0;
   background-color: var(--bg-void);
   background-image: var(--bg-void-image, var(--bg-cyan-tint));
   transition: background-color 1.5s cubic-bezier(0.4, 0, 0.2, 1), background-image 1.5s ease;
-  overflow-x: hidden;
   min-height: 100vh;
 }
 
