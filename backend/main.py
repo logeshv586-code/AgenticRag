@@ -14,6 +14,8 @@ from services.observability_service import get_metrics, get_logs
 from services.deployment_manager import package_deployment
 from services.document_parser import parse_document, get_supported_extensions
 import requests
+import asyncio
+import uuid
 from contextlib import asynccontextmanager
 
 # Configure logging
@@ -47,6 +49,44 @@ def get_best_ollama_model(models: list) -> str:
                 return m
     return models[0] if models else "llama3.1:8b"
 
+# ═══════════════════════════════════════════════════════════
+#  Session-Based RAG Isolation
+# ═══════════════════════════════════════════════════════════
+
+active_sessions: Dict[str, Dict[str, Any]] = {}
+
+def create_user_session(session_id: str, pipeline_id: str, analysis: str = "", expires_in: int = 180) -> dict:
+    """Create a new isolated session mapping session_id -> RAG pipeline."""
+    session = {
+        "pipeline_id": pipeline_id,
+        "analysis": analysis,
+        "created_at": time.time(),
+        "expires_in": expires_in
+    }
+    active_sessions[session_id] = session
+    logger.info(f"📌 Session created: {session_id[:8]}... -> pipeline {pipeline_id} (TTL={expires_in}s)")
+    return session
+
+def get_active_session(session_id: str) -> Optional[dict]:
+    """Return active session or None if expired/missing."""
+    session = active_sessions.get(session_id)
+    if not session:
+        return None
+    elapsed = time.time() - session["created_at"]
+    if elapsed >= session["expires_in"]:
+        del active_sessions[session_id]
+        logger.info(f"⏰ Session expired: {session_id[:8]}...")
+        return None
+    return session
+
+def cleanup_expired_sessions():
+    """Remove all expired sessions."""
+    now = time.time()
+    expired = [sid for sid, s in active_sessions.items() if now - s["created_at"] >= s["expires_in"]]
+    for sid in expired:
+        del active_sessions[sid]
+        logger.info(f"🗑️ Cleaned up expired session: {sid[:8]}...")
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     status = check_ollama_status()
@@ -55,9 +95,21 @@ async def lifespan(app: FastAPI):
         logger.info(f"✅ Ollama running. Available models: {status['models']}")
         logger.info(f"🤖 Platform chatbot will use: {best}")
     else:
-        logger.warning(f"⚠️  Ollama not detected: {status.get('error')}")
-        logger.warning("   Install from https://ollama.ai and run: ollama serve")
+        logger.warning(f"⚠️  No local AI engine detected (Ollama on {OLLAMA_PORT} or local API on 8001).")
+        logger.warning("   Start Ollama or your local .gguf server for chatbot functionality.")
+
+    # Background task: cleanup expired sessions every 30s
+    async def session_cleanup_loop():
+        while True:
+            await asyncio.sleep(30)
+            cleanup_expired_sessions()
+
+    cleanup_task = asyncio.create_task(session_cleanup_loop())
+    logger.info("🔁 Session cleanup background task started (every 30s)")
+
     yield
+
+    cleanup_task.cancel()
 
 app = FastAPI(title="Agentic RAG Creator API", lifespan=lifespan)
 
@@ -88,6 +140,7 @@ class ScrapeRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     query: str
+    session_id: Optional[str] = None  # For session-based RAG routing
     pipeline_id: Optional[str] = None
     audio_base64: Optional[str] = None  # For Voice RAG pipeline
     llm_override: Optional[Dict[str, str]] = None  # {"model": "gpt-4o", "api_key": "sk-...", "base_url": "..."}
@@ -211,12 +264,117 @@ async def api_supported_formats():
 
 
 # ═══════════════════════════════════════════════════════════
+#  GGUF Model Server Auto-Start
+# ═══════════════════════════════════════════════════════════
+
+import subprocess
+import platform as _platform
+
+_gguf_server_process = None
+
+def _get_gguf_model_path() -> str:
+    """Get the platform-aware path to the GGUF model file."""
+    if _platform.system() == "Windows":
+        return os.path.join("E:", os.sep, "AgenticRag", "Qwen3.5-9B-GGUF", "Qwen3.5-9B-Q4_K_M.gguf")
+    else:
+        return os.environ.get("QWEN_GGUF_PATH", "/var/www/agenticrag/backend/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf")
+
+def _try_start_gguf_server() -> tuple:
+    """Try to auto-start a llama_cpp.server with the GGUF model.
+    Returns (base_url, model_name) or (None, None) on failure."""
+    global _gguf_server_process
+
+    model_path = _get_gguf_model_path()
+    if not os.path.exists(model_path):
+        logger.warning(f"⚠️ GGUF model not found at {model_path}")
+        return None, None
+
+    # Check if server is already running from a previous start attempt
+    try:
+        resp = requests.get("http://localhost:8001/v1/models", timeout=2)
+        if resp.status_code == 200:
+            models_data = resp.json().get("data", [])
+            model_name = models_data[0]["id"] if models_data else "qwen-local"
+            return "http://localhost:8001/v1/chat/completions", model_name
+    except Exception:
+        pass
+
+    # Start llama_cpp.server in background
+    try:
+        logger.info(f"🚀 Auto-starting llama_cpp.server with {model_path}...")
+        _gguf_server_process = subprocess.Popen(
+            [
+                "python", "-m", "llama_cpp.server",
+                "--model", model_path,
+                "--host", "0.0.0.0",
+                "--port", "8001",
+                "--n_ctx", "4096",
+                "--n_gpu_layers", "-1"
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # Wait for server to be ready
+        import time as _time
+        for _ in range(30):  # Wait up to 30 seconds
+            _time.sleep(1)
+            try:
+                resp = requests.get("http://localhost:8001/v1/models", timeout=2)
+                if resp.status_code == 200:
+                    models_data = resp.json().get("data", [])
+                    model_name = models_data[0]["id"] if models_data else "qwen-local"
+                    logger.info(f"✅ llama_cpp.server started successfully! Model: {model_name}")
+                    return "http://localhost:8001/v1/chat/completions", model_name
+            except Exception:
+                continue
+        logger.warning("⚠️ llama_cpp.server started but not responding after 30s")
+        return None, None
+    except Exception as e:
+        logger.error(f"❌ Failed to start llama_cpp.server: {e}")
+        return None, None
+
+
+# ═══════════════════════════════════════════════════════════
 #  AI Interaction Endpoints
 # ═══════════════════════════════════════════════════════════
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
-    """Powers the site chatbot robot with full OmniRAG platform knowledge via local Ollama LLM."""
+    """Session-aware chat: routes to RAG pipeline (Test Mode) or Guide LLM."""
+
+    # ── Session-aware routing ──
+    if req.session_id:
+        session = get_active_session(req.session_id)
+        if session:
+            # Test Mode: route to user's RAG pipeline
+            try:
+                remaining = max(0, int(session["expires_in"] - (time.time() - session["created_at"])))
+                result = query_pipeline(session["pipeline_id"], req.query)
+                return {
+                    "answer": result.get("answer", "No answer found."),
+                    "mode": "test",
+                    "session_active": True,
+                    "remaining_seconds": remaining,
+                    "pipeline_id": session["pipeline_id"]
+                }
+            except Exception as e:
+                logger.warning(f"RAG query error for session {req.session_id[:8]}...: {e}")
+                return {
+                    "answer": f"Error querying your RAG pipeline: {str(e)}",
+                    "mode": "test",
+                    "session_active": True,
+                    "remaining_seconds": 0
+                }
+        else:
+            # Session expired or not found — fall through to Guide Mode
+            pass
+
+    # ── Guide Mode (default) ──
+    return _guide_mode_response(req.query)
+
+
+def _guide_mode_response(query: str) -> dict:
+    """Guide Mode: answer using system prompt + local LLM (Ollama or GGUF fallback)."""
     system_prompt = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
 
 You know everything about the OmniRAG platform:
@@ -318,10 +476,45 @@ Answer questions helpfully and concisely. If asked to build or choose a RAG, gui
         response.raise_for_status()
         data = response.json()
         answer = data["choices"][0]["message"]["content"]
-        return {"answer": answer, "model_used": model_name}
+        return {"answer": answer, "mode": "guide", "session_active": False, "model_used": model_name}
     except Exception as e:
         logger.warning(f"LLM Chat Error: {e}")
-        return {"answer": "I am your OmniRAG Neural Assistant! I'm currently initializing. You can ask me about any of the 13 RAG types, how to build your first RAG, supported file types, or which architecture fits your use case. Please try again in a moment.", "model_used": "initializing"}
+        return {"answer": "I am your OmniRAG Neural Assistant! I'm currently initializing. You can ask me about any of the 13 RAG types, how to build your first RAG, supported file types, or which architecture fits your use case. Please try again in a moment.", "mode": "guide", "session_active": False, "model_used": "initializing"}
+
+
+# ═══════════════════════════════════════════════════════════
+#  Session Endpoints
+# ═══════════════════════════════════════════════════════════
+
+class SessionCreateRequest(BaseModel):
+    session_id: str
+    pipeline_id: str
+    analysis: Optional[str] = ""
+
+@app.post("/api/session/create")
+async def api_session_create(req: SessionCreateRequest):
+    """Create a new isolated RAG session for Test Mode."""
+    session = create_user_session(
+        session_id=req.session_id,
+        pipeline_id=req.pipeline_id,
+        analysis=req.analysis or ""
+    )
+    return {
+        "status": "created",
+        "session_id": req.session_id,
+        "pipeline_id": req.pipeline_id,
+        "expires_in": session["expires_in"],
+        "message": f"Session active for {session['expires_in']}s"
+    }
+
+@app.get("/api/session/status")
+async def api_session_status(session_id: str):
+    """Check if a session is still active and return remaining time."""
+    session = get_active_session(session_id)
+    if session:
+        remaining = max(0, int(session["expires_in"] - (time.time() - session["created_at"])))
+        return {"active": True, "remaining_seconds": remaining, "pipeline_id": session["pipeline_id"]}
+    return {"active": False, "remaining_seconds": 0}
 
 
 @app.get("/api/ollama/status")

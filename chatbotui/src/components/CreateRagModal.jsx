@@ -368,15 +368,15 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                     onClick={() => updateConfig('scrapeMode', 'static')}
                     className={`flex-1 p-3 rounded-xl border text-center transition-all duration-300 ${config.scrapeMode === 'static' ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300' : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white'}`}
                   >
-                    <div className="text-sm font-bold">Static Pages</div>
-                    <div className="text-[10px] text-zinc-500 mt-1">Fast extraction via HTML parsing</div>
+                    <div className="text-sm font-bold">📄 Single Page</div>
+                    <div className="text-[10px] text-zinc-500 mt-1">Fast extraction — scrapes only the URLs you enter</div>
                   </button>
                   <button
                     onClick={() => updateConfig('scrapeMode', 'dynamic')}
                     className={`flex-1 p-3 rounded-xl border text-center transition-all duration-300 ${config.scrapeMode === 'dynamic' ? 'bg-purple-500/10 border-purple-500/40 text-purple-300' : 'bg-white/5 border-white/5 text-zinc-400 hover:text-white'}`}
                   >
-                    <div className="text-sm font-bold">Dynamic Pages</div>
-                    <div className="text-[10px] text-zinc-500 mt-1">JS-rendered via headless browser</div>
+                    <div className="text-sm font-bold">🌐 Entire Website</div>
+                    <div className="text-[10px] text-zinc-500 mt-1">Deep crawl — discovers & scrapes all subpages (up to 50)</div>
                   </button>
                 </div>
               </div>
