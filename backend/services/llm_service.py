@@ -7,13 +7,14 @@ Includes model capability validation, GPU detection, and automatic fallback.
 import logging
 import os
 import shutil
+import requests
 from typing import Optional, Dict, List
 
 from haystack.utils import Secret
 
 logger = logging.getLogger(__name__)
 
-LLM_PORT = 8001  # local llama_cpp server port
+LLM_PORT = 8011  # local llama_cpp server port (moved from 8010)
 
 
 # ═══════════════════════════════════════════════════════════
@@ -252,12 +253,8 @@ FALLBACK_CHAIN = {
 
 def get_fallback_model(model_id: str) -> Optional[str]:
     """Get the next fallback model if the primary is unavailable."""
-    chain = FALLBACK_CHAIN.get(model_id, ["qwen-local"])
-    for fallback in chain:
-        validation = validate_model_capabilities(fallback)
-        if validation["available"]:
-            return fallback
-    return "qwen-local"  # Ultimate fallback
+    # Always prefer local qwen for this project
+    return "qwen-local"
 
 
 # ═══════════════════════════════════════════════════════════
@@ -281,20 +278,22 @@ def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Option
             timeout=300.0,
         )
 
-    # Ollama-managed models (30-40GB range)
+    # Prioritize local GGUF models (checked first)
+    if model_id == "qwen-local":
+        return _local_qwen_generator()
+    elif model_id in ("mistral-local",):
+        return _local_mistral_generator()
+    elif model_id in ("llama3-local",):
+        return _local_llama3_generator()
+    elif model_id in ("deepseek-local",):
+        return _local_deepseek_generator()
+
+    # Ollama-managed models (fallback or explicit)
     ollama_models = ["mixtral", "qwen2.5", "llama3.1", "llava", "gemma3", "llama3", "mistral", "phi3"]
     is_ollama = any(m in model_id.lower() for m in ollama_models) or ":" in model_id
-
+    
     if model_id in ("ollama", "ollama-auto") or is_ollama:
         return _ollama_generator(api_key, preferred_model=model_id if ":" in model_id else None)
-    elif model_id == "qwen-local":
-        return _ollama_generator(api_key, preferred_model="qwen2.5")
-    elif model_id in ("mistral-local",):
-        return _ollama_generator(api_key, preferred_model="mistral")
-    elif model_id in ("llama3-local",):
-        return _ollama_generator(api_key, preferred_model="llama3")
-    elif model_id in ("deepseek-local",):
-        return _ollama_generator(api_key, preferred_model="deepseek")
     elif model_id == "gpt4o":
         return _openai_generator(api_key)
     elif model_id == "claude35":
@@ -328,11 +327,12 @@ def list_available_models() -> List[dict]:
 
 def _local_qwen_generator():
     from haystack.components.generators import OpenAIGenerator
+    # Use the 1.5B or 9B model depending on what's started, but OpenAI API doesn't care about the name string here
     return OpenAIGenerator(
         api_key=Secret.from_token("sk-no-key-required"),
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
-        model="Qwen2.5-14B-Instruct-1M-Q3_K_L.gguf",
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        model="Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
+        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
         timeout=300.0,
     )
 
@@ -343,7 +343,7 @@ def _local_mistral_generator():
         api_key=Secret.from_token("sk-no-key-required"),
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="mistral",
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
         timeout=300.0,
     )
 
@@ -355,7 +355,7 @@ def _local_llama3_generator():
         api_key=Secret.from_token("sk-no-key-required"),
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="llama3",
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
         timeout=300.0,
     )
 
@@ -367,7 +367,7 @@ def _local_deepseek_generator():
         api_key=Secret.from_token("sk-no-key-required"),
         api_base_url=f"http://localhost:{LLM_PORT}/v1",
         model="deepseek",
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
         timeout=300.0,
     )
 

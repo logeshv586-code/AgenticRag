@@ -7,6 +7,7 @@ import logging
 from services.scraper import scrape_urls
 from services.rag_builder import deploy_rag_system
 from services.haystack_service import query_pipeline, get_pipeline_graph
+from services.local_llm import chat as local_llm_chat, guide_chat as local_guide_chat, test_chat as local_test_chat, is_model_ready, get_model_info
 from services.llm_service import validate_api_key, list_available_models, detect_gpu_availability, validate_model_capabilities
 from services.tuning_presets import apply_tuning_preset, list_presets, get_rag_defaults
 from services.security_middleware import SecurityMiddleware
@@ -89,13 +90,28 @@ def cleanup_expired_sessions():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    status = check_ollama_status()
-    if status["running"]:
-        best = get_best_ollama_model(status["models"])
-        logger.info(f"✅ Ollama running. Available models: {status['models']}")
+    # --- Auto-start GGUF Server ---
+    _try_start_gguf_server()
+    
+    # Check if local AI is running (Ollama default 11434 or local API on 8011)
+    ollama_status = check_ollama_status()
+    try:
+        # Check for local GGUF server on 8011
+        resp = requests.get("http://localhost:8011/v1/models", timeout=2)
+        local_api_status = resp.status_code == 200
+        if local_api_status:
+            models_data = resp.json().get("data", [])
+            model_loaded = models_data[0]["id"] if models_data else "GGUF"
+            logger.info(f"✅ GGUF Server detected on 8011. Model: {model_loaded}")
+    except Exception:
+        local_api_status = False
+
+    if ollama_status["running"]:
+        best = get_best_ollama_model(ollama_status["models"])
+        logger.info(f"✅ Ollama running. Available models: {ollama_status['models']}")
         logger.info(f"🤖 Platform chatbot will use: {best}")
-    else:
-        logger.warning(f"⚠️  No local AI engine detected (Ollama on {OLLAMA_PORT} or local API on 8001).")
+    elif not local_api_status:
+        logger.warning("⚠️  No local AI engine detected (Ollama on 11434 or local API on 8010).")
         logger.warning("   Start Ollama or your local .gguf server for chatbot functionality.")
 
     # Background task: cleanup expired sessions every 30s
@@ -272,66 +288,72 @@ import platform as _platform
 
 _gguf_server_process = None
 
-def _get_gguf_model_path() -> str:
-    """Get the platform-aware path to the GGUF model file."""
-    if _platform.system() == "Windows":
-        return os.path.join("E:", os.sep, "AgenticRag", "Qwen3.5-9B-GGUF", "Qwen3.5-9B-Q4_K_M.gguf")
-    else:
-        return os.environ.get("QWEN_GGUF_PATH", "/var/www/agenticrag/backend/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf")
-
-def _try_start_gguf_server() -> tuple:
-    """Try to auto-start a llama_cpp.server with the GGUF model.
-    Returns (base_url, model_name) or (None, None) on failure."""
-    global _gguf_server_process
-
-    model_path = _get_gguf_model_path()
-    if not os.path.exists(model_path):
-        logger.warning(f"⚠️ GGUF model not found at {model_path}")
+def _try_start_gguf_server():
+    """Auto-detect and start llama_cpp server with Qwen GGUF (Priority: 1.5B -> 9B)."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    model_paths = [
+        os.path.join(base_dir, "Qwen3.5-9B-GGUF", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"),
+        os.path.join(base_dir, "Qwen3.5-9B-GGUF", "Qwen3.5-9B-Q4_K_M.gguf"),
+    ]
+    
+    selected_model = None
+    for p in model_paths:
+        if os.path.exists(p):
+            selected_model = p
+            break
+            
+    if not selected_model:
+        logger.error("❌ No GGUF models found in E:\\AgenticRag\\Qwen3.5-9B-GGUF")
         return None, None
 
-    # Check if server is already running from a previous start attempt
+    # Check if server is already running on 8011
     try:
-        resp = requests.get("http://localhost:8001/v1/models", timeout=2)
+        resp = requests.get("http://localhost:8011/v1/models", timeout=2)
         if resp.status_code == 200:
             models_data = resp.json().get("data", [])
-            model_name = models_data[0]["id"] if models_data else "qwen-local"
-            return "http://localhost:8001/v1/chat/completions", model_name
+            model_name = models_data[0]["id"] if models_data else "GGUF-Local"
+            return "http://localhost:8011/v1/chat/completions", model_name
     except Exception:
         pass
 
     # Start llama_cpp.server in background
+    import sys
     try:
-        logger.info(f"🚀 Auto-starting llama_cpp.server with {model_path}...")
-        _gguf_server_process = subprocess.Popen(
+        logger.info(f"🚀 Auto-starting llama_cpp.server with {selected_model}...")
+        subprocess.Popen(
             [
-                "python", "-m", "llama_cpp.server",
-                "--model", model_path,
+                sys.executable, "-m", "llama_cpp.server",
+                "--model", selected_model,
                 "--host", "0.0.0.0",
-                "--port", "8001",
+                "--port", "8011",
                 "--n_ctx", "4096",
-                "--n_gpu_layers", "-1"
+                "--n_gpu_layers", "0"  # CPU only for stability on 16GB RAM systems
             ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
         )
-        # Wait for server to be ready
-        import time as _time
-        for _ in range(30):  # Wait up to 30 seconds
-            _time.sleep(1)
-            try:
-                resp = requests.get("http://localhost:8001/v1/models", timeout=2)
-                if resp.status_code == 200:
-                    models_data = resp.json().get("data", [])
-                    model_name = models_data[0]["id"] if models_data else "qwen-local"
-                    logger.info(f"✅ llama_cpp.server started successfully! Model: {model_name}")
-                    return "http://localhost:8001/v1/chat/completions", model_name
-            except Exception:
-                continue
-        logger.warning("⚠️ llama_cpp.server started but not responding after 30s")
-        return None, None
+        
+        # Poll for readiness in a background thread to avoid blocking FastAPI startup
+        def poll():
+            import time as _time
+            for _ in range(20):
+                _time.sleep(1)
+                try:
+                    resp = requests.get("http://localhost:8011/v1/models", timeout=2)
+                    if resp.status_code == 200:
+                        logger.info("✅ llama_cpp.server is now ready!")
+                        return
+                except Exception:
+                    continue
+        
+        import threading
+        threading.Thread(target=poll, daemon=True).start()
+        
     except Exception as e:
         logger.error(f"❌ Failed to start llama_cpp.server: {e}")
-        return None, None
+        
+    return None, None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -340,42 +362,51 @@ def _try_start_gguf_server() -> tuple:
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
-    """Session-aware chat: routes to RAG pipeline (Test Mode) or Guide LLM."""
+    """Session-aware chat: routes to local LLM (Test Mode) or Guide LLM."""
+    
+    # --- 1. Fast Greeting Check ---
+    greetings = ["hi", "hello", "hey", "hola", "namaste", "good morning", "good afternoon"]
+    if req.query.lower().strip().rstrip('?') in greetings:
+        return {
+            "answer": "Hello! I am your OmniRAG Assistant. How can I help you build or query your RAG system today?",
+            "mode": "greeting",
+            "session_active": False
+        }
 
-    # ── Session-aware routing ──
+    # --- 2. Session-aware routing (Test Mode — direct local LLM) ---
     if req.session_id:
         session = get_active_session(req.session_id)
         if session:
-            # Test Mode: route to user's RAG pipeline
             try:
                 remaining = max(0, int(session["expires_in"] - (time.time() - session["created_at"])))
-                result = query_pipeline(session["pipeline_id"], req.query)
+                
+                # Load stored documents for this RAG as context
+                context = _load_rag_context(session["pipeline_id"])
+                answer = local_test_chat(req.query, context)
+                
                 return {
-                    "answer": result.get("answer", "No answer found."),
+                    "answer": answer,
                     "mode": "test",
                     "session_active": True,
                     "remaining_seconds": remaining,
                     "pipeline_id": session["pipeline_id"]
                 }
             except Exception as e:
-                logger.warning(f"RAG query error for session {req.session_id[:8]}...: {e}")
+                logger.warning(f"Test chat error for session {req.session_id[:8]}...: {e}")
                 return {
-                    "answer": f"Error querying your RAG pipeline: {str(e)}",
+                    "answer": "⚠️ Model temporarily unavailable. Please try again.",
                     "mode": "test",
                     "session_active": True,
                     "remaining_seconds": 0
                 }
         else:
-            # Session expired or not found — fall through to Guide Mode
-            pass
+            pass  # Session expired — fall through to Guide Mode
 
-    # ── Guide Mode (default) ──
+    # --- 3. Guide Mode (default — direct local LLM) ---
     return _guide_mode_response(req.query)
 
 
-def _guide_mode_response(query: str) -> dict:
-    """Guide Mode: answer using system prompt + local LLM (Ollama or GGUF fallback)."""
-    system_prompt = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
+PLATFORM_KNOWLEDGE = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
 
 You know everything about the OmniRAG platform:
 
@@ -431,55 +462,76 @@ OmniRAG Engine is an enterprise-grade platform that lets anyone build production
 - Session memory for conversational RAGs
 - Citation mode (always shows sources)
 
-Answer questions helpfully and concisely. If asked to build or choose a RAG, guide the user step by step. Always be encouraging and practical."""
+Answer questions helpfully and concisely. If asked to build or choose a RAG, guide the user step by step. Always be encouraging and practical. Use your retrieval context to provide specific details about OmniRAG features like FAISS, ChromaDB, and Agentic RAG.
 
+## Advanced Technical Details
+- **Vector Stores**: We use ChromaDB and FAISS for local storage. FAISS is recommended for large datasets (1M+ vectors), while ChromaDB is best for metadata-heavy filtering.
+- **Models**: We prefer Qwen 2.5 and Llama 3.1 for local inference. Qwen 2.5 1.5B is our ultra-fast lightweight model.
+- **Architecture**: Our 13 RAG types cover every enterprise need from simple FAQ (Basic) to complex planning (Agentic)."""
+
+# ═══════════════════════════════════════════════════════════
+#  Direct Local LLM Chat Functions (No Haystack Pipeline)
+# ═══════════════════════════════════════════════════════════
+
+# Map pipeline_id -> ragName for loading stored documents
+_pipeline_rag_map: Dict[str, str] = {}
+
+def _load_rag_context(pipeline_id: str, max_chars: int = 3000) -> str:
+    """Load stored documents for a deployed RAG to use as LLM context."""
+    rag_name = _pipeline_rag_map.get(pipeline_id, "")
+    if not rag_name:
+        return "No documents loaded for this pipeline."
+    
+    data_file = os.path.join(os.path.dirname(__file__), "data", rag_name, "scraped_data.txt")
+    if not os.path.exists(data_file):
+        return "No documents found."
+    
     try:
-        # Try Ollama first
-        status = check_ollama_status()
-        if status["running"]:
-            best_model = get_best_ollama_model(status["models"])
-            base_url = f"{OLLAMA_BASE_URL}/v1/chat/completions"
-            model_name = best_model
-        else:
-            # Fallback: try llama_cpp server on port 8001
-            try:
-                resp = requests.get("http://localhost:8001/v1/models", timeout=3)
-                if resp.status_code == 200:
-                    models_data = resp.json().get("data", [])
-                    model_name = models_data[0]["id"] if models_data else "qwen-local"
-                    base_url = "http://localhost:8001/v1/chat/completions"
-                    logger.info(f"🔧 Using llama_cpp fallback model: {model_name}")
-                else:
-                    # Try to auto-start llama_cpp server with GGUF model
-                    base_url, model_name = _try_start_gguf_server()
-                    if not base_url:
-                        return {"answer": "No local AI engine detected. Please start Ollama (port 11434) or ensure the local GGUF model server is running on port 8001.", "model_used": "none"}
-            except Exception:
-                # Try to auto-start llama_cpp server with GGUF model
-                base_url, model_name = _try_start_gguf_server()
-                if not base_url:
-                    return {"answer": "No local AI engine detected. Please start Ollama (port 11434) or ensure the local GGUF model server is running on port 8001.", "model_used": "none"}
-
-        response = requests.post(
-            base_url,
-            json={
-                "model": model_name,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ],
-                "temperature": 0.7,
-                "max_tokens": 1024
-            },
-            timeout=120
-        )
-        response.raise_for_status()
-        data = response.json()
-        answer = data["choices"][0]["message"]["content"]
-        return {"answer": answer, "mode": "guide", "session_active": False, "model_used": model_name}
+        with open(data_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        # Truncate to fit in context window
+        if len(content) > max_chars:
+            content = content[:max_chars] + "\n... [truncated]"
+        return content
     except Exception as e:
-        logger.warning(f"LLM Chat Error: {e}")
-        return {"answer": "I am your OmniRAG Neural Assistant! I'm currently initializing. You can ask me about any of the 13 RAG types, how to build your first RAG, supported file types, or which architecture fits your use case. Please try again in a moment.", "mode": "guide", "session_active": False, "model_used": "initializing"}
+        logger.warning(f"Failed to load context for {rag_name}: {e}")
+        return "Error loading documents."
+
+
+def _static_guide_response(query: str) -> str:
+    """Static fallback when LLM is unavailable."""
+    q = query.lower()
+    if any(w in q for w in ["rag", "type", "architecture", "build"]):
+        return ("OmniRAG supports 13 RAG architectures: Universal Neural, Hybrid, Conversational, "
+                "Multimodal, Structured Intelligence, Graph, Agentic, Realtime, Personalized, "
+                "Multilingual, Voice, Citation, and Guardrails RAG. "
+                "Click 'Start Building' to create one!")
+    if any(w in q for w in ["file", "upload", "format", "document"]):
+        return ("You can upload PDF, DOCX, TXT, CSV, HTML, Markdown, images (JPG/PNG/WEBP), "
+                "and audio (MP3/WAV/M4A). We also scrape websites by URL.")
+    if any(w in q for w in ["model", "llm", "local", "ollama"]):
+        return ("OmniRAG supports local models (Qwen 2.5, LLaMA 3.1, Mixtral via Ollama or GGUF) "
+                "and cloud APIs (OpenAI GPT-4o, Anthropic Claude, Google Gemini).")
+    return ("Welcome to OmniRAG Engine! I can help you build production-ready AI chatbots "
+            "backed by custom knowledge bases. Upload your data, choose a RAG architecture, "
+            "and deploy a live AI endpoint — all without writing code. What would you like to build?")
+
+
+def _guide_mode_response(query: str) -> dict:
+    """Guide Mode: direct call to local GGUF model with platform knowledge."""
+    if not is_model_ready():
+        logger.warning("Guide Mode: local GGUF model not ready, using static fallback")
+        return {"answer": _static_guide_response(query), "mode": "guide", "session_active": False, "model_used": "static-fallback"}
+    
+    try:
+        answer = local_guide_chat(query, PLATFORM_KNOWLEDGE)
+        if answer and "⚠️" not in answer:
+            model_info = get_model_info()
+            return {"answer": answer, "mode": "guide", "session_active": False, "model_used": model_info.get("id", "local-gguf")}
+        raise ValueError("LLM returned error")
+    except Exception as e:
+        logger.warning(f"Guide Mode direct LLM failed ({e}), using static fallback")
+        return {"answer": _static_guide_response(query), "mode": "guide", "session_active": False, "model_used": "static-fallback"}
 
 
 # ═══════════════════════════════════════════════════════════
@@ -546,21 +598,25 @@ async def api_ollama_pull(request: dict):
 
 @app.post("/api/test-chat")
 async def api_test_chat(req: ChatRequest):
-    """Query endpoint for deployed RAG pipelines. Supports text, audio, and LLM override."""
+    """Query endpoint for deployed RAGs — uses direct local LLM with document context."""
     if not req.pipeline_id:
-        return {"answer": "Error: No pipeline_id provided."}
+        return {"answer": "Please create a RAG first before testing."}
 
-    logger.info(f"Executing test chat for pipeline {req.pipeline_id} with query: {req.query}")
-    result = query_pipeline(
-        req.pipeline_id,
-        req.query,
-        audio_base64=req.audio_base64,
-        llm_override=req.llm_override
-    )
+    # --- Fast Greeting Check ---
+    greetings = ["hi", "hello", "hey", "hola", "namaste"]
+    if req.query.lower().strip().rstrip('?') in greetings:
+        return {"answer": "Hi there! I'm ready to answer questions about your data. What would you like to know?"}
 
-    if isinstance(result, dict):
-        return result
-    return {"answer": result}
+    logger.info(f"Test chat for pipeline {req.pipeline_id}: {req.query}")
+    
+    try:
+        # Load stored documents as context and call local LLM directly
+        context = _load_rag_context(req.pipeline_id)
+        answer = local_test_chat(req.query, context)
+        return {"answer": answer}
+    except Exception as e:
+        logger.error(f"Test chat error: {e}")
+        return {"answer": "⚠️ Model temporarily unavailable. Please try again in a moment."}
 
 
 @app.post("/transcribe")
@@ -614,6 +670,11 @@ async def api_deploy(req: DeployRequest):
 
         deployment_info = deploy_rag_system(config)
         pipeline_id = deployment_info.get("pipeline_id", "mock_pipeline_123")
+        
+        # Store pipeline → ragName mapping for direct LLM test chat
+        _pipeline_rag_map[pipeline_id] = config.get("ragName", "")
+        logger.info(f"📌 Mapped pipeline {pipeline_id} → {config.get('ragName', '')}")
+        
         return {
             "status": "success",
             "message": "Agentic RAG deployed successfully.",
@@ -686,6 +747,40 @@ async def api_demo_eratimbers():
         logger.error(f"Demo Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/index-site")
+async def api_index_site(base_url: str = Body(..., embed=True), mode: str = "dynamic"):
+    """Crawl and index the entire site into the Global Guide RAG for fast responses."""
+    try:
+        from services.scraper import scrape_urls
+        logger.info(f"🌐 Indexing entire site: {base_url}")
+        texts = scrape_urls([base_url], mode=mode, max_pages=100)
+        
+        config = {
+            "ragName": "OmniRAG_Global_Guide",
+            "extracted_texts": texts,
+            "ragType": "basic",
+            "dbType": "local",
+            "localDb": "faiss",
+            "llmModel": "qwen-local",
+            "embeddingModel": "bge-local",
+            "chunkSize": 500,
+            "topK": 5,
+            "useReranker": True
+        }
+        
+        from services.rag_builder import deploy_rag_system
+        deploy_rag_system(config)
+        
+        return {
+            "status": "success",
+            "message": f"Site {base_url} indexed into Global Guide.",
+            "pages_count": len(texts)
+        }
+    except Exception as e:
+        logger.error(f"Global Indexing Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
@@ -742,3 +837,7 @@ async def api_get_logs(limit: int = 50, pipeline_id: Optional[str] = None):
     """Get recent RAG query logs."""
     logs = get_logs(limit, pipeline_id)
     return {"status": "success", "count": len(logs), "logs": logs}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8010, reload=True)

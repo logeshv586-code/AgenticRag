@@ -15,11 +15,10 @@ const INITIAL_MESSAGES = [
   {
     id: 1,
     role: 'bot',
-    content: 'Hello! I am your RAG architecture guide, powered by the local Qwen model. How can I help you today?',
+    content: 'Hello! I am your OmniRAG Neural Assistant. I can help you build custom RAG pipelines or explain different architectures. How can I help you today?',
     suggestions: [
       { id: 'build', label: 'Build a Custom RAG' },
-      { id: 'explain', label: 'Explain RAG Types' },
-      { id: 'eratimbers', label: 'Test EraTimbers Demo RAG' }
+      { id: 'explain', label: 'Explain RAG Types' }
     ]
   }
 ];
@@ -343,11 +342,14 @@ function App() {
     setInputValue('');
     setIsLoading(true);
     try {
-      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || `${API_BASE_URL}/api/test-chat`;
+      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || `${API_BASE_URL}/api/chat`;
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text }),
+        body: JSON.stringify({ 
+          query: text,
+          pipeline_id: ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id
+        }),
       });
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -423,8 +425,8 @@ function App() {
   const loadDashboardData = async () => {
     try {
       const [mRes, lRes] = await Promise.all([
-        fetch('http://localhost:8000/api/metrics'),
-        fetch('http://localhost:8000/api/logs?limit=50')
+        fetch(`${API_BASE_URL}/api/metrics`),
+        fetch(`${API_BASE_URL}/api/logs?limit=50`)
       ]);
       if (mRes.ok) setMetrics(await mRes.json());
       if (lRes.ok) setLogs(await lRes.json());

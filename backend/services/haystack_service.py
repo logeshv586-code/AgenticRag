@@ -161,25 +161,41 @@ def build_and_deploy_pipeline(config: dict) -> Tuple[str, Pipeline]:
         split_result = splitter.run(documents=documents)
         split_docs = split_result.get("documents", documents)
 
-        # Write to primary store
-        write_documents(primary_store, split_docs)
+        # 2. Embed documents (Required for FAISS/Vector search)
+        from .embedding_service import get_document_embedder
+        embedder = get_document_embedder(embedding_model, api_keys.get("openai"))
+        if embedder:
+            logger.info(f"Embedding {len(split_docs)} documents using {embedding_model}...")
+            embedded_result = embedder.run(documents=split_docs)
+            embedded_docs = embedded_result.get("documents", split_docs)
+        else:
+            embedded_docs = split_docs
 
-        # Write to secondary store (hybrid mode)
+        # 3. Write to primary store
+        write_documents(primary_store, embedded_docs)
+
+        # 4. Write to secondary store (hybrid mode)
         if secondary_store:
-            write_documents(secondary_store, split_docs)
+            write_documents(secondary_store, embedded_docs)
 
     # ── 3. Prepare shared components ─────────────────────
     # Retriever
+    db_type = config.get("localDb", "chroma") if config.get("dbType") == "local" else config.get("cloudDb")
+    
     if isinstance(primary_store, InMemoryDocumentStore):
         retriever = InMemoryBM25Retriever(document_store=primary_store, top_k=top_k)
+    elif "ChromaDocumentStore" in str(type(primary_store)):
+        from haystack_integrations.components.retrievers.chroma import ChromaEmbeddingRetriever
+        retriever = ChromaEmbeddingRetriever(document_store=primary_store, top_k=top_k)
+    elif "FAISSDocumentStore" in str(type(primary_store)):
+        from haystack_integrations.components.retrievers.faiss import FAISSEmbeddingRetriever
+        retriever = FAISSEmbeddingRetriever(document_store=primary_store, top_k=top_k)
     else:
+        # Fallback to BM25 if no specialized retriever found
         try:
-            from haystack.components.retrievers.in_memory import InMemoryEmbeddingRetriever
             retriever = InMemoryBM25Retriever(document_store=primary_store, top_k=top_k)
         except Exception:
-            retriever = InMemoryBM25Retriever(
-                document_store=InMemoryDocumentStore(), top_k=top_k
-            )
+            retriever = InMemoryBM25Retriever(document_store=InMemoryDocumentStore(), top_k=top_k)
 
     # LLM Generator
     llm_key = api_keys.get("openai") or api_keys.get("anthropic") or api_keys.get("mistral") or api_keys.get("gemini")
@@ -217,6 +233,14 @@ def build_and_deploy_pipeline(config: dict) -> Tuple[str, Pipeline]:
         pipeline = Pipeline()
         pipeline.add_component("retriever", retriever)
 
+        # LLM
+        pipeline.add_component("llm", generator)
+
+        # Prompt builder
+        template = _get_prompt_template(rag_type, config)
+        prompt_builder = PromptBuilder(template=template)
+        pipeline.add_component("prompt_builder", prompt_builder)
+
         # Optional reranker
         if use_reranker:
             try:
@@ -226,26 +250,31 @@ def build_and_deploy_pipeline(config: dict) -> Tuple[str, Pipeline]:
                     top_k=top_k,
                 )
                 pipeline.add_component("reranker", reranker)
-            except ImportError:
-                logger.warning("Reranker not available — skipping")
+                logger.info("✅ Reranker added to pipeline")
+            except Exception as e:
+                logger.warning(f"Reranker initialization failed: {e} — skipping")
                 use_reranker = False
 
-        # Prompt builder
-        template = _get_prompt_template(rag_type, config)
-        prompt_builder = PromptBuilder(template=template)
-        pipeline.add_component("prompt_builder", prompt_builder)
-
-        # LLM
-        pipeline.add_component("llm", generator)
-
-        # Connect
+        # ── 5. Connect Components (Haystack 2.x style) ────
+        
+        # Check if we need an embedder for the retriever
+        is_embedding_retriever = any(x in str(type(retriever)) for x in ["EmbeddingRetriever", "ChromaEmbeddingRetriever", "FAISSEmbeddingRetriever"])
+        logger.info(f"Retriever type: {type(retriever)}, is_embedding_retriever: {is_embedding_retriever}")
+        
+        if is_embedding_retriever:
+            from .embedding_service import get_text_embedder
+            query_embedder = get_text_embedder(embedding_model, api_keys.get("openai"))
+            if query_embedder:
+                pipeline.add_component("query_embedder", query_embedder)
+                pipeline.connect("query_embedder.embedding", "retriever.query_embedding")
+        
         if use_reranker:
             pipeline.connect("retriever.documents", "reranker.documents")
             pipeline.connect("reranker.documents", "prompt_builder.documents")
         else:
-            pipeline.connect("retriever", "prompt_builder.documents")
+            pipeline.connect("retriever.documents", "prompt_builder.documents")
 
-        pipeline.connect("prompt_builder", "llm")
+        pipeline.connect("prompt_builder.prompt", "llm.prompt")
 
     # ── 5. Register pipeline ─────────────────────────────
     active_pipelines[pipeline_id] = pipeline
@@ -355,14 +384,24 @@ def query_pipeline(pipeline_id: str, query: str, audio_base64: str = None, llm_o
 
             # ── Standard pipeline execution ──────────────────
             run_params = {
-                "retriever": {"query": query},
                 "prompt_builder": {"query": query},
             }
 
-            if meta.get("use_reranker"):
+            # Route query to embedder or retriever based on what the pipeline expects
+            node_names = list(pipeline.graph.nodes)
+            if "query_embedder" in node_names:
+                run_params["query_embedder"] = {"text": query}
+            elif "retriever" in node_names:
+                run_params["retriever"] = {"query": query}
+
+            if "reranker" in node_names:
                 run_params["reranker"] = {"query": query}
 
-            result = pipeline.run(run_params)
+            try:
+                result = pipeline.run(run_params)
+            except Exception as run_err:
+                logger.error(f"Pipeline run error: {run_err}")
+                return {"answer": "⚠️ Model temporarily unavailable. Try again."}
 
             replies = result.get("llm", {}).get("replies", [])
             if replies:

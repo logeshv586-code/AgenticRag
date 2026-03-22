@@ -16,6 +16,7 @@ python-docx
 chromadb
 chroma-haystack
 faiss-cpu
+faiss-haystack
 anthropic
 playwright
 pinecone-client

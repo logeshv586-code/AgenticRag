@@ -47,14 +47,12 @@ def _create_faiss_store(collection_name: str):
     """Create a FAISS-backed document store."""
     try:
         from haystack_integrations.document_stores.faiss import FAISSDocumentStore
-        index_path = os.path.join(STORES_DIR, "faiss", f"{collection_name}.faiss")
-        os.makedirs(os.path.dirname(index_path), exist_ok=True)
+        # Haystack 2.x FAISSDocumentStore is typically in-memory and then saved/loaded.
+        # It doesn't use sql_url for metadata by default in the same way 1.x did.
         store = FAISSDocumentStore(
-            sql_url=f"sqlite:///{os.path.join(STORES_DIR, 'faiss', f'{collection_name}.db')}",
-            embedding_dim=768,
-            faiss_index_factory_str="Flat",
+            embedding_dim=384,
         )
-        logger.info(f"FAISS store created: {collection_name}")
+        logger.info(f"FAISS store created: {collection_name} (dim=384)")
         return store
     except ImportError:
         logger.warning("faiss-haystack not installed — falling back to InMemory")
@@ -257,7 +255,7 @@ def create_document_store(config: dict) -> Union[object, Tuple[object, object]]:
     cloud_db = config.get("cloudDb", "pinecone")
     local_db = config.get("localDb", "chroma")
     api_keys = config.get("apiKeys", {})
-    collection = f"rag_{uuid.uuid4().hex[:8]}"
+    collection = config.get("ragName") if config.get("ragName") else f"rag_{uuid.uuid4().hex[:8]}"
 
     cloud_store = None
     local_store = None

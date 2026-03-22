@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def scrape_urls(urls, mode="static", max_pages=50):
+def scrape_urls(urls, mode="static", max_pages=100):
     """
     Scrapes URLs and extracts text content.
 

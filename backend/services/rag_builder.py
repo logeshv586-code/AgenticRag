@@ -111,7 +111,7 @@ with open("pipeline_config.json") as f:
 
 print(f"Pipeline Type: {{config['rag_type']}}")
 print(f"LLM: {{config['llm_model']}}")
-print(f"Ready for queries on port 8010")
+print(f"Ready for queries on port 8000")
 """
     script_path = os.path.join(package_dir, "run.py")
     with open(script_path, 'w') as f:
