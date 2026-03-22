@@ -1,19 +1,69 @@
-*.gguf
+# ========================
+# 🐍 Python
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
 
-# Environments
+# Virtual environments
 venv/
 .venv/
-__pycache__/
-*.pyc
-*.pyo
+backend/venv/
 
-# Node
+# Environment variables
+.env
+.env.*
+
+# ========================
+# 📦 Models & AI Data (IMPORTANT)
+# ========================
+*.gguf
+models/
+checkpoints/
+
+# ========================
+# 📊 Project Data
+# ========================
+data/
+uploads/
+scraped_data/
+deployments/
+
+# ========================
+# 🗄️ Database
+# ========================
+*.db
+*.sqlite3
+
+# ========================
+# ⚛️ Node / React
+# ========================
 node_modules/
 dist/
+build/
 dist-ssr/
 
-# IDE and OS
+# ========================
+# 🧱 Build files
+# ========================
+*.egg-info/
+
+# ========================
+# 📝 Logs
+# ========================
+*.log
+
+# ========================
+# 💻 IDE / OS
+# ========================
 .vscode/
 .idea/
 .DS_Store
-.env
+Thumbs.db
+
+# ========================
+# 🧪 Temp files
+# ========================
+*.tmp
+*.temp
