@@ -1,2 +1,0 @@
-# For Linux VPS
-FROM /var/www/agenticrag/backend/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette, RefreshCw, Timer, Clock } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
@@ -7,6 +7,7 @@ import GlassIcons from './components/GlassIcons';
 import FloatingLines from './components/FloatingLines';
 import CreateRagModal from './components/CreateRagModal';
 import ThemeSettings from './components/ThemeSettings';
+import LegalModal from './components/LegalModal';
 import { API_BASE_URL } from './config';
 const RagAnalyticsDashboard = lazy(() => import('./components/RagAnalyticsDashboard'));
 
@@ -30,38 +31,6 @@ function App() {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  // ── Dual-Mode Session State ──────────────────────────────
-  const [chatMode, setChatMode] = useState('guide'); // 'guide' or 'test'
-  const [sessionData, setSessionData] = useState(null); // {session_id, pipeline_id, expires_at}
-  const [sessionRemaining, setSessionRemaining] = useState(0); // countdown seconds
-  const sessionIdRef = useRef(crypto.randomUUID()); // unique per browser tab
-
-  // Countdown timer for Test Mode
-  useEffect(() => {
-    if (chatMode !== 'test' || !sessionData) return;
-    const interval = setInterval(() => {
-      const remaining = Math.max(0, Math.floor((sessionData.expires_at - Date.now()) / 1000));
-      setSessionRemaining(remaining);
-      if (remaining <= 0) {
-        // Session expired → switch back to Guide Mode
-        clearInterval(interval);
-        setChatMode('guide');
-        setSessionData(null);
-        setSessionRemaining(0);
-        setMessages(prev => [...prev, {
-          id: Date.now(),
-          role: 'bot',
-          content: '⏱ **Test session has ended.** Your temporary RAG chatbot has been deactivated. You are now back in Guide Mode — ask me anything about RAG architectures or start building a new one!',
-          suggestions: [
-            { id: 'build', label: 'Build a Custom RAG' },
-            { id: 'explain', label: 'Explain RAG Types' }
-          ]
-        }]);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [chatMode, sessionData]);
 
   // Drag state
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -97,15 +66,15 @@ function App() {
   }, []);
 
   const handleDragStart = (e) => {
-    if (e.type === 'mousedown' && e.button !== 0) return;
-    
-    if (e.type === 'mousedown') e.preventDefault();
-    
+    const isTouch = e.type === 'touchstart';
+    if (!isTouch && e.button !== 0) return;
+
+    // e.preventDefault(); // Remove to allow click
     setHasMoved(false);
     setIsDragging(true);
 
-    const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
 
     dragRef.current = {
       startX: clientX,
@@ -115,17 +84,22 @@ function App() {
     };
 
     const onMove = (moveEvent) => {
-      const moveClientX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
-      const moveClientY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+      const currentX = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const currentY = moveEvent.type === 'touchmove' ? moveEvent.touches[0].clientY : moveEvent.clientY;
 
-      if (Math.abs(moveClientX - dragRef.current.startX) > 3 || Math.abs(moveClientY - dragRef.current.startY) > 3) {
+      if (Math.abs(currentX - dragRef.current.startX) > 3 || Math.abs(currentY - dragRef.current.startY) > 3) {
         setHasMoved(true);
+        if (moveEvent.type === 'touchmove') moveEvent.preventDefault(); // Prevent scrolling while dragging
       }
-      let newX = dragRef.current.initialX + (moveClientX - dragRef.current.startX);
-      let newY = dragRef.current.initialY + (moveClientY - dragRef.current.startY);
+
+      let newX = dragRef.current.initialX + (currentX - dragRef.current.startX);
+      let newY = dragRef.current.initialY + (currentY - dragRef.current.startY);
+
       const padding = 20;
-      const elementWidth = 80 + padding;
-      const elementHeight = 80 + padding;
+      const isMobile = window.innerWidth < 768;
+      const elementWidth = (isMobile ? 40 : 80) + padding;
+      const elementHeight = (isMobile ? 40 : 80) + padding;
+
       newX = Math.max(padding, Math.min(newX, window.innerWidth - elementWidth));
       newY = Math.max(padding, Math.min(newY, window.innerHeight - elementHeight));
       setPosition({ x: newX, y: newY });
@@ -139,10 +113,13 @@ function App() {
       document.removeEventListener('touchend', onUp);
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-    document.addEventListener('touchmove', onMove, { passive: false });
-    document.addEventListener('touchend', onUp);
+    if (isTouch) {
+      document.addEventListener('touchmove', onMove, { passive: false });
+      document.addEventListener('touchend', onUp);
+    } else {
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
   };
 
   const messagesEndRef = useRef(null);
@@ -166,6 +143,7 @@ function App() {
     const saved = localStorage.getItem('omnirag_theme_hue');
     return saved ? parseInt(saved) : 190; // Default cyan hue
   });
+  const [legalModalType, setLegalModalType] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('omnirag_theme_hue', themeHue);
@@ -376,27 +354,16 @@ function App() {
     setInputValue('');
     setIsLoading(true);
     try {
-      // Unified /api/chat endpoint — backend routes based on session
-      const response = await fetch(`${API_BASE_URL}/api/chat`, {
+      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || `${API_BASE_URL}/api/test-chat`;
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: text,
-          session_id: sessionIdRef.current
-        }),
+        body: JSON.stringify({ query: text }),
       });
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
       const data = await response.json();
-
-      // Check if session expired (backend signals this)
-      if (data.session_expired) {
-        setChatMode('guide');
-        setSessionData(null);
-        setSessionRemaining(0);
-      }
-
       const botMsg = {
         id: Date.now() + 1,
         role: 'bot',
@@ -430,39 +397,12 @@ function App() {
         const response = await fetch(`${API_BASE_URL}/api/demo/eratimbers`, { method: 'POST' });
         if (!response.ok) throw new Error('Demo failed');
         const data = await response.json();
+
         setRagConfig({ deployData: data });
-
-        // Create isolated session for demo RAG
-        const pipelineId = data?.deployment_info?.pipeline_id || data?.pipeline_id || 'demo';
-        try {
-          const sessionResp = await fetch(`${API_BASE_URL}/api/session/create`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              session_id: sessionIdRef.current,
-              pipeline_id: pipelineId,
-              analysis: 'Era Timbers Demo'
-            })
-          });
-          if (sessionResp.ok) {
-            const sessionInfo = await sessionResp.json();
-            const expiresAt = Date.now() + (sessionInfo.expires_in * 1000);
-            setSessionData({
-              session_id: sessionIdRef.current,
-              pipeline_id: pipelineId,
-              expires_at: expiresAt
-            });
-            setChatMode('test');
-            setSessionRemaining(sessionInfo.expires_in);
-          }
-        } catch (sessionErr) {
-          console.error('Failed to create demo session:', sessionErr);
-        }
-
         const botMsg = {
           id: Date.now() + 1,
           role: 'bot',
-          content: `✅ Successfully scraped eratimbers.com and deployed a **Hybrid RAG**! 🔵 **Test Mode active** — you have **3 minutes** to ask anything about Era Timbers products (e.g. "What timber types are available?").`
+          content: `✅ Successfully scraped eratimbers.com and deployed a Hybrid RAG using the local Qwen model! You are now chatting with the deployed pipeline. Ask me anything about Era Timbers products (e.g. "What timber types are available?").`
         };
         setMessages(prev => [...prev, botMsg]);
       } catch (error) {
@@ -872,12 +812,12 @@ function App() {
         </section>
 
         <footer className="ent-footer">
-          <div className="ent-footer-logo">AI Platform</div>
-          <div className="ent-footer-copy">© 2026 Enterprise AI. All rights reserved.</div>
+          <div className="ent-footer-logo">omniragengine</div>
+          <div className="ent-footer-copy">© 2026 Omniragengine. All rights reserved.</div>
           <div className="flex gap-6">
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Privacy</a>
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Terms</a>
-            <a href="#" className="text-xs text-zinc-500 border-none hover:text-white transition">Contact</a>
+            <button onClick={() => setLegalModalType('privacy')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Privacy</button>
+            <button onClick={() => setLegalModalType('terms')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Terms</button>
+            <button onClick={() => setLegalModalType('contact')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Contact</button>
           </div>
         </footer>
       </main>
@@ -961,60 +901,22 @@ function App() {
       }
 
       <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 right-0 sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
-        <div className="w-screen sm:w-[420px] h-[100dvh] sm:h-[650px] glass-panel sm:rounded-[40px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
+        <div className="w-screen sm:w-[420px] h-[75dvh] sm:h-[650px] glass-panel mobile-chat-window sm:rounded-[40px] rounded-t-[30px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
-          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
+          <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5 mobile-chat-header">
             <div className="flex items-center gap-4">
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 ${
-                chatMode === 'test'
-                  ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-blue-500/20'
-                  : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-black shadow-cyan-500/20'
-              }`}>
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20">
                 <Bot className="w-7 h-7" />
               </div>
               <div>
                 <h4 className="font-bold text-white tracking-wide">Neural Assistant</h4>
                 <div className="flex items-center gap-2 mt-0.5">
-                  {chatMode === 'test' ? (
-                    <>
-                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-[0_0_8px_#60a5fa]"></span>
-                      <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">🔵 Test Mode</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
-                      <span className="text-[10px] uppercase font-bold text-green-400 tracking-wider">🟢 Guide Mode</span>
-                    </>
-                  )}
+                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
+                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Node Active</span>
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
-              {/* Session Timer Badge */}
-              {chatMode === 'test' && sessionRemaining > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 mr-1 animate-pulse">
-                  <Timer className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="text-xs font-bold text-blue-400 tabular-nums">
-                    {Math.floor(sessionRemaining / 60).toString().padStart(2, '0')}:{(sessionRemaining % 60).toString().padStart(2, '0')}
-                  </span>
-                </div>
-              )}
-              <button
-                title="End Chat & New Scrape"
-                onClick={() => {
-                  setChatMode('guide');
-                  setSessionData(null);
-                  setSessionRemaining(0);
-                  setRagConfig({ themeHue: 190 });
-                  setMessages(INITIAL_MESSAGES);
-                  setInitialCreateConfig(null);
-                  setIsCreateModalOpen(true);
-                  setIsOpen(false);
-                }}
-                className="p-2 rounded-full transition hover:bg-white/10 text-zinc-400 hover:text-red-400"
-              >
-                <RefreshCw className="w-5 h-5" />
-              </button>
               <button
                 onClick={() => setIsThemeSettingsOpen(!isThemeSettingsOpen)}
                 className={`p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
@@ -1160,9 +1062,9 @@ function App() {
               if (!hasMoved) setIsOpen(true);
             }}
           >
-            <div className="relative w-[50px] h-[50px] flex items-center justify-center overflow-visible group/bot">
+            <div className="relative w-[40px] h-[40px] sm:w-[50px] sm:h-[50px] flex items-center justify-center overflow-visible group/bot">
               {/* Robot Container - Compact and always visible */}
-              <div className="scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
+              <div className="scale-[0.5] sm:scale-[0.65] drop-shadow-[0_0_16px_rgba(0,210,255,0.3)] group-hover:scale-[0.75] transition-transform duration-300 pointer-events-none" style={{ filter: `hue-rotate(${themeHue - 190}deg)` }}>
                 <Robot3D />
               </div>
             </div>
@@ -1230,49 +1132,23 @@ function App() {
         isOpen={isCreateModalOpen}
         initialConfig={initialCreateConfig}
         onClose={() => setIsCreateModalOpen(false)}
-        onComplete={async (config) => {
+        onComplete={(config) => {
           setRagConfig(config);
           setIsCreateModalOpen(false);
-
-          // Extract pipeline_id from deployment response
-          const pipelineId = config?.deployData?.pipeline_id
-            || config?.deployData?.deployment_info?.pipeline_id
-            || 'unknown';
-
-          // Create isolated session on backend
-          try {
-            const sessionResp = await fetch(`${API_BASE_URL}/api/session/create`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                session_id: sessionIdRef.current,
-                pipeline_id: pipelineId,
-                analysis: config?.analysis || ''
-              })
-            });
-            if (sessionResp.ok) {
-              const sessionInfo = await sessionResp.json();
-              const expiresAt = Date.now() + (sessionInfo.expires_in * 1000);
-              setSessionData({
-                session_id: sessionIdRef.current,
-                pipeline_id: pipelineId,
-                expires_at: expiresAt
-              });
-              setChatMode('test');
-              setSessionRemaining(sessionInfo.expires_in);
-            }
-          } catch (err) {
-            console.error('Failed to create session:', err);
-          }
-
           const msg = {
             id: Date.now(),
             role: 'bot',
-            content: `✅ Your **${(config.ragType || 'custom').toUpperCase()} RAG** has been deployed and a **Test Session** is now active! You have **3 minutes** to test your chatbot — ask anything about the scraped content.\n\n_When the timer runs out, you'll return to Guide Mode automatically._`
+            content: `Your ${config.ragType.toUpperCase()} RAG for ${config.useCase} using ${config.vectorDb} is successfully deployed! How can I help you today?`
           };
           setMessages([msg]);
           setIsOpen(true);
         }}
+      />
+
+      <LegalModal
+        isOpen={!!legalModalType}
+        onClose={() => setLegalModalType(null)}
+        type={legalModalType}
       />
     </div >
   );

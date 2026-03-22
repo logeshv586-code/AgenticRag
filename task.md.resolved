@@ -1,0 +1,16 @@
+# Task List
+
+- [ ] Create `RagCreationModal.jsx` component for the UI to configure and build a custom RAG.
+  - Form steps/sections:
+    - Data Source (Website URL, Document/Image Upload)
+    - RAG Architecture Type (Basic, Hybrid, Conversational, Multimodal, Structured, Graph, Agentic, Real-time, Personalized, Cross-lingual, Voice, Citation, Guardrails)
+    - Use Case / Persona (FAQ, Support, Sales, HR, Internal Search, Doc QA, Data Analyst, Compliance)
+    - Vector Database (Pinecone, Milvus, Weaviate, Qdrant)
+    - Chatbot Appearance (Robot style, color theme)
+  - Beautiful, dynamic UI with animations and theming.
+- [ ] Update [App.jsx](file:///c:/Users/e629/Documents/AgenticRag/chatbotui/src/App.jsx)
+  - Add "Create Custom RAG" button to the hero section.
+  - Integrate `RagCreationModal` and handle state.
+  - Allow the deployed chatbot to use the selected color/method based on what the user configured in the creation modal.
+- [ ] Implement varied robot colors/themes in `MiniRobot`, `Robot3D`, and `WaitingRobot` (or dynamically inject CSS vars).
+- [ ] Ensure the overall experience feels premium and "wow" the user as requested.

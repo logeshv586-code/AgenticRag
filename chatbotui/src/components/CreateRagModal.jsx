@@ -4,7 +4,7 @@ import RagVisualizer from './RagVisualizer';
 import { API_BASE_URL } from '../config';
 
 const DB_TYPES = [
-  { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.', icon: Cloud, status: 'Coming Soon' },
+  { id: 'cloud', name: 'Cloud Vector DB', desc: 'Managed, scalable remote databases.', icon: Cloud },
   { id: 'local', name: 'Local Vector DB', desc: 'Self-hosted, private databases.', icon: HardDrive },
   { id: 'hybrid', name: 'Hybrid DB', desc: 'Combine both cloud and local storage.', icon: Network },
 ];
@@ -36,12 +36,11 @@ const RAG_TYPES = [
 ];
 
 const LLM_MODELS = [
-  { id: 'qwen3.5-9b-gguf', name: 'Local Qwen 3.5 9B', desc: 'State-of-the-art offline model. No API key needed.', provider: 'local', setup: 'Requires ~10GB VRAM. Model loaded from E:/ path.', icon: Brain },
   { id: 'qwen-local', name: 'Local Qwen 2.5 14B', desc: 'Offline, private. No API key needed.', provider: 'local', setup: 'Requires ~10GB VRAM. Model auto-loaded from local GGUF file.', icon: Server },
   { id: 'mistral-local', name: 'Local Mistral 7B', desc: 'Offline, fast inference.', provider: 'local', setup: 'Requires ~6GB VRAM. Download GGUF from HuggingFace.', icon: Terminal },
-  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.', provider: 'openai', setup: 'Requires OpenAI API key.', icon: Globe, status: 'Coming Soon' },
-  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.', provider: 'anthropic', setup: 'Requires Anthropic API key.', icon: Globe, status: 'Coming Soon' },
-  { id: 'gemini', name: 'Google Gemini Pro', desc: 'Cloud, multimodal ready.', provider: 'gemini', setup: 'Requires Google AI API key.', icon: Globe, status: 'Coming Soon' }
+  { id: 'gpt4o', name: 'OpenAI GPT-4o', desc: 'Cloud, high capability.', provider: 'openai', setup: 'Requires OpenAI API key.', icon: Globe },
+  { id: 'claude35', name: 'Anthropic Claude 3.5 Sonnet', desc: 'Cloud, fast and smart.', provider: 'anthropic', setup: 'Requires Anthropic API key.', icon: Globe },
+  { id: 'gemini', name: 'Google Gemini Pro', desc: 'Cloud, multimodal ready.', provider: 'gemini', setup: 'Requires Google AI API key.', icon: Globe }
 ];
 
 const EMBEDDING_MODELS = [
@@ -97,7 +96,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
     files: [],
 
     // Step 2: DB Selection
-    dbType: 'local',
+    dbType: 'cloud',
     cloudDb: 'pinecone',
     localDb: 'chroma',
 
@@ -108,7 +107,7 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
     dynamicConfig: {},
 
     // Step 5: Models
-    llmModel: 'qwen3.5-9b-gguf',
+    llmModel: 'qwen-local',
     embeddingModel: 'bge-local',
 
     // Step 6: Advanced Tuning
@@ -434,11 +433,6 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         <span className={`font-bold text-sm text-premium ${config.dbType === type.id ? 'text-cyan-400' : 'text-zinc-200'}`}>
                           {type.name}
                         </span>
-                        {type.status && (
-                          <span className="text-[10px] bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full border border-white/5 whitespace-nowrap">
-                            {type.status}
-                          </span>
-                        )}
                       </div>
                       {config.dbType === type.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                     </div>
@@ -732,11 +726,6 @@ export default function CreateRagModal({ isOpen, onClose, onComplete, initialCon
                         <div className="flex items-center gap-2">
                           {m.icon && <m.icon className={`w-4 h-4 ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-400 group-hover:text-cyan-300'}`} />}
                           <span className={`text-sm font-bold ${config.llmModel === m.id ? 'text-cyan-400' : 'text-zinc-200'}`}>{m.name}</span>
-                          {m.status && (
-                            <span className="text-[10px] bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full border border-white/5 whitespace-nowrap ml-2">
-                              {m.status}
-                            </span>
-                          )}
                         </div>
                         {config.llmModel === m.id && <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center"><Check className="w-3 h-3 text-black stroke-[3]" /></div>}
                       </div>
