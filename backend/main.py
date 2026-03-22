@@ -14,6 +14,8 @@ from services.observability_service import get_metrics, get_logs
 from services.deployment_manager import package_deployment
 from services.document_parser import parse_document, get_supported_extensions
 import requests
+import asyncio
+import uuid
 from contextlib import asynccontextmanager
 
 # Configure logging
@@ -21,6 +23,49 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 import time
+
+# ═══════════════════════════════════════════════════════════
+#  Session-Based RAG Isolation
+# ═══════════════════════════════════════════════════════════
+
+# Each user gets an isolated session mapping to their RAG pipeline
+active_sessions = {}
+
+def create_user_session(session_id: str, pipeline_id: str, analysis: str = "") -> dict:
+    """Create a new isolated RAG session for a user."""
+    session = {
+        "pipeline_id": pipeline_id,
+        "analysis": analysis,
+        "created_at": time.time(),
+        "expires_in": 180  # 3 minutes
+    }
+    active_sessions[session_id] = session
+    logger.info(f"🔵 Session created: {session_id} → pipeline {pipeline_id} (TTL: 180s)")
+    return session
+
+def get_active_session(session_id: str) -> dict | None:
+    """Get active session or None if expired/missing."""
+    session = active_sessions.get(session_id)
+    if not session:
+        return None
+    elapsed = time.time() - session["created_at"]
+    if elapsed >= session["expires_in"]:
+        del active_sessions[session_id]
+        logger.info(f"⏱ Session expired and removed: {session_id}")
+        return None
+    return session
+
+def cleanup_expired_sessions():
+    """Remove all expired sessions."""
+    now = time.time()
+    expired = [
+        sid for sid, s in active_sessions.items()
+        if now - s["created_at"] >= s["expires_in"]
+    ]
+    for sid in expired:
+        del active_sessions[sid]
+    if expired:
+        logger.info(f"🧹 Cleaned up {len(expired)} expired sessions")
 
 # --- Local LLM Server Management (Ollama) ---
 OLLAMA_PORT = 11434
@@ -40,7 +85,8 @@ def check_ollama_status() -> dict:
 
 def get_best_ollama_model(models: list) -> str:
     """Pick the best available model for text generation."""
-    priority = ["mixtral", "qwen2.5", "llama3.1", "llama3", "gemma3", "gemma2", "mistral", "phi3", "llama2"]
+    # Add new GGUF model to top priority
+    priority = ["qwen3.5-9b", "mixtral", "qwen2.5", "llama3.1", "llama3", "gemma3", "gemma2", "mistral", "phi3", "llama2"]
     for preferred in priority:
         for m in models:
             if preferred in m.lower():
@@ -49,15 +95,39 @@ def get_best_ollama_model(models: list) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 1. Check Ollama
     status = check_ollama_status()
     if status["running"]:
         best = get_best_ollama_model(status["models"])
-        logger.info(f"✅ Ollama running. Available models: {status['models']}")
-        logger.info(f"🤖 Platform chatbot will use: {best}")
+        logger.info(f"✅ Ollama running on port {OLLAMA_PORT}. Models: {status['models']}")
+        logger.info(f"🤖 Platform assistant using: {best}")
     else:
-        logger.warning(f"⚠️  Ollama not detected: {status.get('error')}")
-        logger.warning("   Install from https://ollama.ai and run: ollama serve")
+        # 2. Fallback to local Model API (llama_cpp)
+        try:
+            resp = requests.get("http://localhost:8001/v1/models", timeout=3)
+            if resp.status_code == 200:
+                logger.info("✅ Local Model API detected on port 8001.")
+                logger.info("🤖 Platform assistant using: Local Direct API")
+            else:
+                logger.warning("⚠️  No local AI engine detected (Ollama on 11434 or local API on 8001).")
+                logger.warning("   Start Ollama or your local .gguf server for chatbot functionality.")
+        except Exception:
+            logger.warning("⚠️  No local AI engine detected (Ollama on 11434 or local API on 8001).")
+            logger.warning("   Start Ollama or your local .gguf server for chatbot functionality.")
+
+    # 3. Start background session cleanup task
+    async def session_cleanup_loop():
+        while True:
+            await asyncio.sleep(30)
+            cleanup_expired_sessions()
+
+    cleanup_task = asyncio.create_task(session_cleanup_loop())
+    logger.info("🔁 Session cleanup background task started (every 30s)")
+
     yield
+
+    # Shutdown: cancel cleanup task
+    cleanup_task.cancel()
 
 app = FastAPI(title="Agentic RAG Creator API", lifespan=lifespan)
 
@@ -89,6 +159,7 @@ class ScrapeRequest(BaseModel):
 class ChatRequest(BaseModel):
     query: str
     pipeline_id: Optional[str] = None
+    session_id: Optional[str] = None  # For session-based RAG routing
     audio_base64: Optional[str] = None  # For Voice RAG pipeline
     llm_override: Optional[Dict[str, str]] = None  # {"model": "gpt-4o", "api_key": "sk-...", "base_url": "..."}
 
@@ -216,80 +287,94 @@ async def api_supported_formats():
 
 @app.post("/api/chat")
 async def api_chat(req: ChatRequest):
-    """Powers the site chatbot robot with full OmniRAG platform knowledge via local Ollama LLM."""
-    system_prompt = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
+    """Unified chat endpoint with session-based routing.
+    - If session_id has an active RAG session → route to RAG pipeline (Test Mode)
+    - Otherwise → use Guide Mode (OmniRAG platform assistant)
+    """
 
-You know everything about the OmniRAG platform:
+    # ── SESSION-AWARE ROUTING ──────────────────────────────────
+    if req.session_id:
+        session = get_active_session(req.session_id)
+        if session:
+            # ✅ Active RAG session → route to user's pipeline
+            logger.info(f"🔵 Test Mode: routing query for session {req.session_id} → pipeline {session['pipeline_id']}")
+            remaining = max(0, session["expires_in"] - (time.time() - session["created_at"]))
+            try:
+                result = query_pipeline(
+                    session["pipeline_id"],
+                    req.query,
+                    audio_base64=req.audio_base64,
+                    llm_override=req.llm_override
+                )
+                answer = result if isinstance(result, str) else result.get("answer", str(result))
+                return {
+                    "answer": answer,
+                    "mode": "test",
+                    "session_active": True,
+                    "remaining_seconds": int(remaining),
+                    "pipeline_id": session["pipeline_id"]
+                }
+            except Exception as e:
+                logger.error(f"RAG pipeline error for session {req.session_id}: {e}")
+                return {
+                    "answer": f"Error querying your RAG pipeline: {str(e)}",
+                    "mode": "test",
+                    "session_active": True,
+                    "remaining_seconds": int(remaining)
+                }
+        else:
+            # Session expired or not found
+            logger.info(f"⏱ Session {req.session_id} expired or not found → Guide Mode")
+            # Fall through to guide mode, but flag session as expired
+            guide_response = await _guide_mode_response(req.query)
+            guide_response["session_expired"] = True
+            guide_response["mode"] = "guide"
+            return guide_response
 
-## Platform Overview
-OmniRAG Engine is an enterprise-grade platform that lets anyone build production-ready AI chatbots backed by custom knowledge bases. Users upload their data (documents, images, audio, websites), choose a RAG architecture, and deploy a live AI endpoint — all without writing code.
+    # ── GUIDE MODE (Default) ──────────────────────────────────
+    response = await _guide_mode_response(req.query)
+    response["mode"] = "guide"
+    return response
 
-## 13 RAG Architecture Types You Can Build
-1. **Universal Neural RAG** — Vector search for precise text retrieval. Best for FAQs, knowledge bases.
-2. **Global Data Integration (Hybrid RAG)** — BM25 + dense vector search with Reciprocal Rank Fusion. Best for documentation, code search.
-3. **Enterprise Cognitive RAG (Conversational)** — Maintains session history and memory. Best for customer support, AI tutors.
-4. **Global Context RAG (Multimodal)** — Retrieve images, audio, and video alongside text. Best for media search, product catalogs.
-5. **Structured Intelligence RAG** — Text-to-SQL for structured/tabular data. Best for data analysis, financial reports.
-6. **Synaptic Graph RAG** — Reasoning across knowledge graphs and entity relationships. Best for legal, medical research.
-7. **Autonomous Network (Agentic RAG)** — Multi-step planning agents with tool use. Best for complex research, data pipelines.
-8. **Live Neural Stream (Realtime RAG)** — Streaming ingestion for fresh content. Best for news, ops alerts.
-9. **Adaptive Persona RAG** — Personalized retrieval using user profiles. Best for portals, learning platforms.
-10. **Universal Matrix (Multilingual RAG)** — Native support for 94+ languages. Best for global sites, multilingual support.
-11. **Vocal Synthesis (Voice RAG)** — Voice in/out with speech-to-text and text-to-speech. Best for hotlines, kiosks.
-12. **Verified Intelligence (Citation RAG)** — Always shows sources and references. Best for knowledge pages, audits.
-13. **Policy Guard Architecture (Guardrails RAG)** — Topic restrictions and safety compliance. Best for healthcare, enterprise.
 
-## How to Build a RAG (Step by Step)
-1. Click **Start Building** or **Deploy Assistant** button on the homepage.
-2. Choose a RAG type or assistant template.
-3. Enter your data sources — upload files (PDF, DOCX, CSV, HTML, images, audio) or paste URLs to scrape.
-4. Configure settings — chunk size, top-K retrieval, LLM model, embedding model, vector database.
-5. Click **Deploy** — your RAG is live in seconds with a unique pipeline ID.
-6. Test your RAG at the /chat/:pipelineId endpoint using the built-in chat interface.
+async def _guide_mode_response(query: str) -> dict:
+    """Generate a response using the OmniRAG Guide assistant (LLM + prompt)."""
+    system_prompt = """You are 'OmniRAG', the Neural Platform Assistant — an expert AI guide for the Agentic RAG Platform.
 
-## Supported File Types for RAG Creation
-- **Documents**: PDF, DOCX, TXT, CSV, HTML, Markdown
-- **Images**: JPG, PNG, WEBP, BMP, TIFF (described by AI vision model)
-- **Audio**: MP3, WAV, M4A, OGG (transcribed by local Whisper AI)
-- **Websites**: Any URL — we scrape and index the content
-- **Multilingual**: Any language — auto-detected and translated for indexing
+### YOUR KNOWLEDGE & CAPABILITIES:
+- **13 RAG Architectures**: You support Standard (Universal Neural), Conversational (Cognitive), Multimodal (Global Context), Agentic (Autonomous Node), Graph (Synaptic), Real-time (Live Stream), personalized, cross-lingual, voice, citation-verified, and guardrailed RAGs.
+- **RAG Factory**: You have a 10-step guided 'Factory' to build custom pipelines.
+- **Knowledge Base**: Answer questions about RAG concepts, the differences between architectures, and how the platform works.
+- **Tone**: Futuristic, futuristic, but practical.
 
-## LLM Models Supported
-- **Local (your server)**: Ollama — LLaMA 3.1, Mixtral, Qwen2.5, LLaVA (vision), Gemma3
-- **Cloud APIs**: OpenAI GPT-4o, Anthropic Claude 3.5, Google Gemini Pro
-- Users can also provide their own API key when testing their deployed RAG
-
-## Vector Databases Supported
-- Local: ChromaDB, FAISS
-- Cloud: Pinecone, Qdrant, Elasticsearch
-
-## Key Features
-- Agentic reasoning with multi-step planning
-- Policy Guard for content compliance
-- Hybrid retrieval (BM25 + semantic)
-- Real-time streaming ingestion
-- Built-in observability dashboard (metrics, logs)
-- One-click deployment packaging (Docker/K8s)
-- Session memory for conversational RAGs
-- Citation mode (always shows sources)
-
-Answer questions helpfully and concisely. If asked to build or choose a RAG, guide the user step by step. Always be encouraging and practical."""
+If asked 'Hi' or 'Hello', respond as a friendly AI assistant ready to explain the platform or RAG concepts. Only suggest the 'Custom RAG Factory' if it fits the user's explicit goal of creation."""
 
     try:
-        # Get available Ollama models and pick the best one
+        # Attempt to use Ollama first
         status = check_ollama_status()
-        if not status["running"]:
-            return {"answer": "The local AI engine is starting up. Please try again in a moment. (Ollama not detected — ensure it's running on port 11434)"}
-
-        best_model = get_best_ollama_model(status["models"])
+        base_url = f"{OLLAMA_BASE_URL}/v1/chat/completions"
+        if status["running"]:
+            model_name = get_best_ollama_model(status["models"])
+        else:
+            # Fallback to local llama_cpp instance (port 8001)
+            try:
+                resp = requests.get("http://localhost:8001/v1/models", timeout=3)
+                if resp.status_code == 200:
+                    models = resp.json().get("data", [])
+                    model_name = models[0]["id"] if models else "qwen-local"
+                    base_url = "http://localhost:8001/v1/chat/completions"
+                else:
+                    return {"answer": "No local AI engine detected. Please ensure Ollama (port 11434) or local llama_cpp (port 8001) is running.", "model_used": "none"}
+            except Exception:
+                return {"answer": "No local AI engine detected. Please ensure Ollama (port 11434) or local llama_cpp (port 8001) is running.", "model_used": "none"}
 
         response = requests.post(
-            f"{OLLAMA_BASE_URL}/v1/chat/completions",
+            base_url,
             json={
-                "model": best_model,
+                "model": model_name,
                 "messages": [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": req.query}
+                    {"role": "user", "content": query}
                 ],
                 "temperature": 0.7,
                 "max_tokens": 1024
@@ -299,7 +384,7 @@ Answer questions helpfully and concisely. If asked to build or choose a RAG, gui
         response.raise_for_status()
         data = response.json()
         answer = data["choices"][0]["message"]["content"]
-        return {"answer": answer, "model_used": best_model}
+        return {"answer": answer, "model_used": model_name}
     except Exception as e:
         logger.warning(f"LLM Chat Error: {e}")
         return {"answer": "I am your OmniRAG Neural Assistant! I'm currently initializing. You can ask me about any of the 13 RAG types, how to build your first RAG, supported file types, or which architecture fits your use case. Please try again in a moment.", "model_used": "initializing"}
@@ -477,6 +562,41 @@ async def api_demo_eratimbers():
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+# ═══════════════════════════════════════════════════════════
+#  Session Management Endpoints
+# ═══════════════════════════════════════════════════════════
+
+class SessionCreateRequest(BaseModel):
+    session_id: str
+    pipeline_id: str
+    analysis: Optional[str] = ""
+
+@app.post("/api/session/create")
+async def api_session_create(req: SessionCreateRequest):
+    """Create a new isolated RAG session for a user after deployment."""
+    session = create_user_session(req.session_id, req.pipeline_id, req.analysis)
+    return {
+        "status": "success",
+        "session_id": req.session_id,
+        "pipeline_id": req.pipeline_id,
+        "expires_in": session["expires_in"],
+        "expires_at": session["created_at"] + session["expires_in"]
+    }
+
+@app.get("/api/session/status")
+async def api_session_status(session_id: str):
+    """Check if a session is still active and how much time remains."""
+    session = get_active_session(session_id)
+    if session:
+        remaining = max(0, session["expires_in"] - (time.time() - session["created_at"]))
+        return {
+            "active": True,
+            "remaining_seconds": int(remaining),
+            "pipeline_id": session["pipeline_id"]
+        }
+    return {"active": False, "remaining_seconds": 0}
 
 
 # ═══════════════════════════════════════════════════════════

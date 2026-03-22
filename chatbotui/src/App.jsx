@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette, RefreshCw, Timer, Clock } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
@@ -30,6 +30,38 @@ function App() {
   const [inputValue, setInputValue] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // ── Dual-Mode Session State ──────────────────────────────
+  const [chatMode, setChatMode] = useState('guide'); // 'guide' or 'test'
+  const [sessionData, setSessionData] = useState(null); // {session_id, pipeline_id, expires_at}
+  const [sessionRemaining, setSessionRemaining] = useState(0); // countdown seconds
+  const sessionIdRef = useRef(crypto.randomUUID()); // unique per browser tab
+
+  // Countdown timer for Test Mode
+  useEffect(() => {
+    if (chatMode !== 'test' || !sessionData) return;
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((sessionData.expires_at - Date.now()) / 1000));
+      setSessionRemaining(remaining);
+      if (remaining <= 0) {
+        // Session expired → switch back to Guide Mode
+        clearInterval(interval);
+        setChatMode('guide');
+        setSessionData(null);
+        setSessionRemaining(0);
+        setMessages(prev => [...prev, {
+          id: Date.now(),
+          role: 'bot',
+          content: '⏱ **Test session has ended.** Your temporary RAG chatbot has been deactivated. You are now back in Guide Mode — ask me anything about RAG architectures or start building a new one!',
+          suggestions: [
+            { id: 'build', label: 'Build a Custom RAG' },
+            { id: 'explain', label: 'Explain RAG Types' }
+          ]
+        }]);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [chatMode, sessionData]);
 
   // Drag state
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -65,24 +97,32 @@ function App() {
   }, []);
 
   const handleDragStart = (e) => {
-    if (e.button !== 0) return;
-    e.preventDefault();
+    if (e.type === 'mousedown' && e.button !== 0) return;
+    
+    if (e.type === 'mousedown') e.preventDefault();
+    
     setHasMoved(false);
     setIsDragging(true);
 
+    const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+    const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+
     dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: clientX,
+      startY: clientY,
       initialX: position.x,
       initialY: position.y
     };
 
     const onMove = (moveEvent) => {
-      if (Math.abs(moveEvent.clientX - dragRef.current.startX) > 3 || Math.abs(moveEvent.clientY - dragRef.current.startY) > 3) {
+      const moveClientX = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientX : moveEvent.clientX;
+      const moveClientY = moveEvent.type.includes('touch') ? moveEvent.touches[0].clientY : moveEvent.clientY;
+
+      if (Math.abs(moveClientX - dragRef.current.startX) > 3 || Math.abs(moveClientY - dragRef.current.startY) > 3) {
         setHasMoved(true);
       }
-      let newX = dragRef.current.initialX + (moveEvent.clientX - dragRef.current.startX);
-      let newY = dragRef.current.initialY + (moveEvent.clientY - dragRef.current.startY);
+      let newX = dragRef.current.initialX + (moveClientX - dragRef.current.startX);
+      let newY = dragRef.current.initialY + (moveClientY - dragRef.current.startY);
       const padding = 20;
       const elementWidth = 80 + padding;
       const elementHeight = 80 + padding;
@@ -95,10 +135,14 @@ function App() {
       setIsDragging(false);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
     };
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, { passive: false });
+    document.addEventListener('touchend', onUp);
   };
 
   const messagesEndRef = useRef(null);
@@ -332,16 +376,27 @@ function App() {
     setInputValue('');
     setIsLoading(true);
     try {
-      const endpoint = ragConfig?.deployData?.deployment_info?.query_endpoint || `${API_BASE_URL}/api/test-chat`;
-      const response = await fetch(endpoint, {
+      // Unified /api/chat endpoint — backend routes based on session
+      const response = await fetch(`${API_BASE_URL}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: text }),
+        body: JSON.stringify({
+          query: text,
+          session_id: sessionIdRef.current
+        }),
       });
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
       const data = await response.json();
+
+      // Check if session expired (backend signals this)
+      if (data.session_expired) {
+        setChatMode('guide');
+        setSessionData(null);
+        setSessionRemaining(0);
+      }
+
       const botMsg = {
         id: Date.now() + 1,
         role: 'bot',
@@ -375,12 +430,39 @@ function App() {
         const response = await fetch(`${API_BASE_URL}/api/demo/eratimbers`, { method: 'POST' });
         if (!response.ok) throw new Error('Demo failed');
         const data = await response.json();
-
         setRagConfig({ deployData: data });
+
+        // Create isolated session for demo RAG
+        const pipelineId = data?.deployment_info?.pipeline_id || data?.pipeline_id || 'demo';
+        try {
+          const sessionResp = await fetch(`${API_BASE_URL}/api/session/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: sessionIdRef.current,
+              pipeline_id: pipelineId,
+              analysis: 'Era Timbers Demo'
+            })
+          });
+          if (sessionResp.ok) {
+            const sessionInfo = await sessionResp.json();
+            const expiresAt = Date.now() + (sessionInfo.expires_in * 1000);
+            setSessionData({
+              session_id: sessionIdRef.current,
+              pipeline_id: pipelineId,
+              expires_at: expiresAt
+            });
+            setChatMode('test');
+            setSessionRemaining(sessionInfo.expires_in);
+          }
+        } catch (sessionErr) {
+          console.error('Failed to create demo session:', sessionErr);
+        }
+
         const botMsg = {
           id: Date.now() + 1,
           role: 'bot',
-          content: `✅ Successfully scraped eratimbers.com and deployed a Hybrid RAG using the local Qwen model! You are now chatting with the deployed pipeline. Ask me anything about Era Timbers products (e.g. "What timber types are available?").`
+          content: `✅ Successfully scraped eratimbers.com and deployed a **Hybrid RAG**! 🔵 **Test Mode active** — you have **3 minutes** to ask anything about Era Timbers products (e.g. "What timber types are available?").`
         };
         setMessages(prev => [...prev, botMsg]);
       } catch (error) {
@@ -883,18 +965,56 @@ function App() {
 
           <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-black shadow-lg shadow-cyan-500/20">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-500 ${
+                chatMode === 'test'
+                  ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white shadow-blue-500/20'
+                  : 'bg-gradient-to-br from-cyan-500 to-blue-600 text-black shadow-cyan-500/20'
+              }`}>
                 <Bot className="w-7 h-7" />
               </div>
               <div>
                 <h4 className="font-bold text-white tracking-wide">Neural Assistant</h4>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
-                  <span className="text-[10px] uppercase font-bold text-zinc-400 tracking-wider">Node Active</span>
+                  {chatMode === 'test' ? (
+                    <>
+                      <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse shadow-[0_0_8px_#60a5fa]"></span>
+                      <span className="text-[10px] uppercase font-bold text-blue-400 tracking-wider">🔵 Test Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_#22c55e]"></span>
+                      <span className="text-[10px] uppercase font-bold text-green-400 tracking-wider">🟢 Guide Mode</span>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Session Timer Badge */}
+              {chatMode === 'test' && sessionRemaining > 0 && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/30 mr-1 animate-pulse">
+                  <Timer className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs font-bold text-blue-400 tabular-nums">
+                    {Math.floor(sessionRemaining / 60).toString().padStart(2, '0')}:{(sessionRemaining % 60).toString().padStart(2, '0')}
+                  </span>
+                </div>
+              )}
+              <button
+                title="End Chat & New Scrape"
+                onClick={() => {
+                  setChatMode('guide');
+                  setSessionData(null);
+                  setSessionRemaining(0);
+                  setRagConfig({ themeHue: 190 });
+                  setMessages(INITIAL_MESSAGES);
+                  setInitialCreateConfig(null);
+                  setIsCreateModalOpen(true);
+                  setIsOpen(false);
+                }}
+                className="p-2 rounded-full transition hover:bg-white/10 text-zinc-400 hover:text-red-400"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
               <button
                 onClick={() => setIsThemeSettingsOpen(!isThemeSettingsOpen)}
                 className={`p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
@@ -1035,6 +1155,7 @@ function App() {
             className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
             style={{ left: position.x, top: position.y }}
             onMouseDown={handleDragStart}
+            onTouchStart={handleDragStart}
             onClick={() => {
               if (!hasMoved) setIsOpen(true);
             }}
@@ -1109,13 +1230,45 @@ function App() {
         isOpen={isCreateModalOpen}
         initialConfig={initialCreateConfig}
         onClose={() => setIsCreateModalOpen(false)}
-        onComplete={(config) => {
+        onComplete={async (config) => {
           setRagConfig(config);
           setIsCreateModalOpen(false);
+
+          // Extract pipeline_id from deployment response
+          const pipelineId = config?.deployData?.pipeline_id
+            || config?.deployData?.deployment_info?.pipeline_id
+            || 'unknown';
+
+          // Create isolated session on backend
+          try {
+            const sessionResp = await fetch(`${API_BASE_URL}/api/session/create`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                session_id: sessionIdRef.current,
+                pipeline_id: pipelineId,
+                analysis: config?.analysis || ''
+              })
+            });
+            if (sessionResp.ok) {
+              const sessionInfo = await sessionResp.json();
+              const expiresAt = Date.now() + (sessionInfo.expires_in * 1000);
+              setSessionData({
+                session_id: sessionIdRef.current,
+                pipeline_id: pipelineId,
+                expires_at: expiresAt
+              });
+              setChatMode('test');
+              setSessionRemaining(sessionInfo.expires_in);
+            }
+          } catch (err) {
+            console.error('Failed to create session:', err);
+          }
+
           const msg = {
             id: Date.now(),
             role: 'bot',
-            content: `Your ${config.ragType.toUpperCase()} RAG for ${config.useCase} using ${config.vectorDb} is successfully deployed! How can I help you today?`
+            content: `✅ Your **${(config.ragType || 'custom').toUpperCase()} RAG** has been deployed and a **Test Session** is now active! You have **3 minutes** to test your chatbot — ask anything about the scraped content.\n\n_When the timer runs out, you'll return to Guide Mode automatically._`
           };
           setMessages([msg]);
           setIsOpen(true);

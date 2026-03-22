@@ -1212,6 +1212,8 @@ body {
     border-radius: 0 !important;
     position: fixed !important;
     inset: 0 !important;
+    background: rgba(6, 13, 20, 0.98) !important;
+    backdrop-filter: blur(40px) saturate(180%) !important;
   }
 
   .group.cursor-pointer {

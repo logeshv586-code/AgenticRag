@@ -140,6 +140,16 @@ MODEL_CAPABILITIES = {
         "model_size": "5GB",
     },
     # ─── Legacy llama_cpp local models (kept for backward compatibility) ───
+    "qwen3.5-9b-gguf": {
+        "display_name": "Qwen 3.5 9B (Local GGUF)",
+        "type": "local",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 32768,
+        "requires_gpu": True,
+        "min_vram_mb": 8000,
+        "model_size": "9GB",
+    },
     "qwen-local": {
         "display_name": "Qwen 2.5 14B (local .gguf)",
         "type": "local",
@@ -287,6 +297,8 @@ def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Option
 
     if model_id in ("ollama", "ollama-auto") or is_ollama:
         return _ollama_generator(api_key, preferred_model=model_id if ":" in model_id else None)
+    elif model_id == "qwen3.5-9b-gguf":
+        return _local_qwen35_generator()
     elif model_id == "qwen-local":
         return _ollama_generator(api_key, preferred_model="qwen2.5")
     elif model_id in ("mistral-local",):
@@ -325,6 +337,28 @@ def list_available_models() -> List[dict]:
 # ═══════════════════════════════════════════════════════════
 #  Local Model Generators (via llama_cpp)
 # ═══════════════════════════════════════════════════════════
+
+def _local_qwen35_generator():
+    """Qwen 3.5 9B via llama_cpp directly using a platform-aware path."""
+    from haystack.components.generators import OpenAIGenerator
+    import os
+    import platform
+
+    # Platform-aware path
+    if platform.system() == "Windows":
+        model_path = "E:/AgenticRag/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf"
+    else:
+        # Default Linux path based on VPS screenshot
+        model_path = os.getenv("QWEN_GGUF_PATH", "/var/www/agenticrag/backend/Qwen3.5-9B-GGUF/Qwen3.5-9B-Q4_K_M.gguf")
+
+    return OpenAIGenerator(
+        api_key=Secret.from_token("sk-no-key-required"),
+        api_base_url=f"http://localhost:{LLM_PORT}/v1",
+        model=model_path,
+        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
+        timeout=300.0,
+    )
+
 
 def _local_qwen_generator():
     from haystack.components.generators import OpenAIGenerator

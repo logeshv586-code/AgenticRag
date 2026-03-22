@@ -1,1 +1,19 @@
 *.gguf
+
+# Environments
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+.env
