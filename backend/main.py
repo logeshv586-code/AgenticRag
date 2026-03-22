@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 import os
@@ -311,6 +311,7 @@ def _mount_gguf_server(fastapi_app: FastAPI):
             llama_cpp.server.settings.ModelSettings(
                 model=selected_model,
                 n_ctx=4096,
+                n_threads=16,   # Speed up CPU inference
                 n_gpu_layers=0  # CPU only for stability
             )
         ]
@@ -388,9 +389,15 @@ def api_chat(req: ChatRequest):
             pass  # Session expired — fall through to Guide Mode
 
     # --- 3. Guide Mode (default — direct local LLM) ---
-    guide_resp = _guide_mode_response(req.query)
-    guide_resp["answer"] = _clean_markdown(guide_resp.get("answer", ""))
-    return guide_resp
+    if not is_model_ready():
+        return {"answer": _static_guide_response(req.query), "mode": "guide", "session_active": False}
+        
+    def stream_generator():
+        from services.local_llm import guide_chat_stream
+        for chunk in guide_chat_stream(req.query, PLATFORM_KNOWLEDGE):
+            yield chunk
+
+    return StreamingResponse(stream_generator(), media_type="text/plain")
 
 
 PLATFORM_KNOWLEDGE = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.

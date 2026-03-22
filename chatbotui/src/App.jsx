@@ -351,16 +351,39 @@ function App() {
           pipeline_id: ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id
         }),
       });
+
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      const botMsg = {
-        id: Date.now() + 1,
-        role: 'bot',
-        content: data.answer,
-      };
-      setMessages(prev => [...prev, botMsg]);
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('text/plain')) {
+        // STREAMING MODE
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let botContent = "";
+        
+        const botMsgId = Date.now() + 1;
+        setMessages(prev => [...prev, { id: botMsgId, role: 'bot', content: "" }]);
+        setIsLoading(false); // Stop computing animation once stream starts
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          botContent += chunk;
+          setMessages(prev => prev.map(m => m.id === botMsgId ? { ...m, content: botContent } : m));
+        }
+      } else {
+        // JSON MODE (Standard Fallback or specialized endpoints)
+        const data = await response.json();
+        const botMsg = {
+          id: Date.now() + 1,
+          role: 'bot',
+          content: data.answer || "No response.",
+        };
+        setMessages(prev => [...prev, botMsg]);
+      }
     } catch (error) {
       console.error('Error:', error);
       const errorMsg = {

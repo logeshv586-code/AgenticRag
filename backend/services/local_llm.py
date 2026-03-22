@@ -92,39 +92,86 @@ def chat(
     return "⚠️ Model temporarily unavailable. Please try again in a moment."
 
 
+def chat_stream(
+    messages: List[Dict[str, str]],
+    temperature: float = 0.3,
+    max_tokens: int = 512,
+):
+    """
+    Streaming version of chat(). Yields text chunks as they arrive.
+    """
+    payload = {
+        "model": "local-gguf",
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "stream": True,
+    }
+
+    try:
+        # Use a fresh request for streaming
+        resp = requests.post(
+            CHAT_ENDPOINT,
+            json=payload,
+            timeout=TIMEOUT,
+            stream=True
+        )
+        
+        if resp.status_code != 200:
+            yield f"⚠️ Error {resp.status_code}: {resp.text[:100]}"
+            return
+
+        import json
+        for line in resp.iter_lines():
+            if line:
+                decoded_line = line.decode('utf-8')
+                if decoded_line.startswith('data: '):
+                    data_str = decoded_line[6:]
+                    if data_str.strip() == '[DONE]':
+                        break
+                    try:
+                        data = json.loads(data_str)
+                        chunk = data.get("choices", [{}])[0].get("delta", {}).get("content", "")
+                        if chunk:
+                            yield chunk
+                    except Exception:
+                        continue
+    except Exception as e:
+        logger.error(f"Streaming error: {e}")
+        yield "⚠️ Connection lost. Please try again."
+
+
 def guide_chat(query: str, platform_knowledge: str) -> str:
-    """
-    Guide Mode: Answer user questions about the OmniRAG platform.
-    Uses platform knowledge as system prompt.
-    """
+    """Guide Mode: Answer questions about OmniRAG."""
     messages = [
-        {
-            "role": "system",
-            "content": (
-                f"{platform_knowledge}\n\n"
-                "Answer the user's question helpfully and concisely based on your knowledge of OmniRAG. "
-                "If asked about building a RAG, guide them step by step. Be practical and encouraging."
-            ),
-        },
+        {"role": "system", "content": f"{platform_knowledge}\n\nAnswer helpfully and concisely."},
         {"role": "user", "content": query},
     ]
-    return chat(messages, temperature=0.3, max_tokens=512)
+    return chat(messages)
+
+
+def guide_chat_stream(query: str, platform_knowledge: str):
+    """Streaming Guide Mode."""
+    messages = [
+        {"role": "system", "content": f"{platform_knowledge}\n\nAnswer helpfully and concisely."},
+        {"role": "user", "content": query},
+    ]
+    return chat_stream(messages)
 
 
 def test_chat(query: str, context_docs: str) -> str:
-    """
-    Test Mode: Answer questions using retrieved document context.
-    Documents are passed as context in the system prompt.
-    """
+    """Test Mode: Answer questions using retrieved context."""
     messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are a helpful AI assistant. Answer the question based ONLY on the provided context. "
-                "If the context doesn't contain the answer, say so honestly.\n\n"
-                f"Context:\n{context_docs}"
-            ),
-        },
+        {"role": "system", "content": f"Context:\n{context_docs}\n\nAnswer based ONLY on context."},
         {"role": "user", "content": query},
     ]
-    return chat(messages, temperature=0.3, max_tokens=512)
+    return chat(messages)
+
+
+def test_chat_stream(query: str, context_docs: str):
+    """Streaming Test Mode."""
+    messages = [
+        {"role": "system", "content": f"Context:\n{context_docs}\n\nAnswer based ONLY on context."},
+        {"role": "user", "content": query},
+    ]
+    return chat_stream(messages)
