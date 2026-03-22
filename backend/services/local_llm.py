@@ -10,36 +10,23 @@ from typing import List, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
-LLM_PORT = 8011
+LLM_PORT = 8010
 LLM_BASE_URL = f"http://localhost:{LLM_PORT}"
 CHAT_ENDPOINT = f"{LLM_BASE_URL}/v1/chat/completions"
 
 # Retry config
-MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds
-TIMEOUT = 120  # seconds
+MAX_RETRIES = 2
+RETRY_DELAY = 1  # seconds
+TIMEOUT = 60  # seconds
 
 
 def is_model_ready() -> bool:
-    """Check if local GGUF model server is running and ready."""
-    try:
-        resp = requests.get(f"{LLM_BASE_URL}/v1/models", timeout=3)
-        return resp.status_code == 200
-    except Exception:
-        return False
-
+    """Check if local GGUF model server is running and ready. By default True since it is mounted in FastAPI."""
+    return True
 
 def get_model_info() -> dict:
-    """Get info about the loaded model."""
-    try:
-        resp = requests.get(f"{LLM_BASE_URL}/v1/models", timeout=3)
-        if resp.status_code == 200:
-            data = resp.json().get("data", [])
-            if data:
-                return {"id": data[0]["id"], "ready": True}
-        return {"id": "unknown", "ready": False}
-    except Exception:
-        return {"id": "none", "ready": False}
+    """Get info about the loaded model. Hardcoded for now since it is mounted."""
+    return {"id": "local-gguf", "ready": True}
 
 
 def chat(

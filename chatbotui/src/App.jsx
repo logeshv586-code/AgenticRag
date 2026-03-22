@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, lazy, Suspense } from 'react';
-import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette } from 'lucide-react';
+import { ArrowLeft, MoreHorizontal, ThumbsUp, ThumbsDown, Copy, Send, LayoutGrid, Bot, MessageCircle, X, Minus, ShoppingCart, Briefcase, GraduationCap, Building2, Leaf, Plane, Cpu, Users, Search, Layers, Database, Globe, Wand2, Mic, Volume2, Book, Shield, Brain, Workflow, Languages, Info, Play, Check, ChevronDown, Menu, Palette, Trash2, DownloadCloud } from 'lucide-react';
 import Robot3D from './components/Robot3D';
 import MiniRobot from './components/MiniRobot';
 import WaitingRobot from './components/WaitingRobot';
@@ -403,6 +403,30 @@ function App() {
       }
     }
   };
+
+  const handleClearChat = async () => {
+    const pipelineId = ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id;
+    if (pipelineId) {
+       try {
+         await fetch(`${API_BASE_URL}/api/memory/${pipelineId}/clear`, { method: 'DELETE' });
+       } catch (e) {
+         console.warn("Could not clear backend memory", e);
+       }
+    }
+    setMessages([{
+      id: Date.now(),
+      role: 'bot',
+      content: 'Memory wiped! Starting a fresh session.',
+    }]);
+  };
+
+  const handleExportZip = () => {
+    const pipelineId = ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id;
+    if (pipelineId) {
+       window.open(`${API_BASE_URL}/api/export/${pipelineId}`, '_blank');
+    }
+  };
+
   const openModal = (type, item) => {
     setSelected({ type, item });
   };
@@ -908,6 +932,22 @@ function App() {
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              {(ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id) && (
+                <button
+                  onClick={handleExportZip}
+                  title="Export RAG as ZIP"
+                  className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white"
+                >
+                  <DownloadCloud className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              )}
+              <button
+                onClick={handleClearChat}
+                title="Clear Chat Memory"
+                className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-rose-400"
+              >
+                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
+              </button>
               <button
                 onClick={() => setIsThemeSettingsOpen(!isThemeSettingsOpen)}
                 className={`p-1.5 sm:p-2 rounded-full transition ${isThemeSettingsOpen ? 'bg-cyan-500/20 text-cyan-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}

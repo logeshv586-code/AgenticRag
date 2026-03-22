@@ -1,7 +1,11 @@
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+import os
+import zipfile
+from pathlib import Path
 import os
 import logging
 from services.scraper import scrape_urls
@@ -90,31 +94,19 @@ def cleanup_expired_sessions():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- Auto-start GGUF Server ---
-    _try_start_gguf_server()
+    # Mount GGUF Server on 8010
+    _mount_gguf_server(app)
     
-    # Check if local AI is running (Ollama default 11434 or local API on 8011)
+    # Check if local AI is running (Ollama default 11434)
     ollama_status = check_ollama_status()
-    try:
-        # Check for local GGUF server on 8011
-        resp = requests.get("http://localhost:8011/v1/models", timeout=2)
-        local_api_status = resp.status_code == 200
-        if local_api_status:
-            models_data = resp.json().get("data", [])
-            model_loaded = models_data[0]["id"] if models_data else "GGUF"
-            logger.info(f"✅ GGUF Server detected on 8011. Model: {model_loaded}")
-    except Exception:
-        local_api_status = False
 
     if ollama_status["running"]:
         best = get_best_ollama_model(ollama_status["models"])
         logger.info(f"✅ Ollama running. Available models: {ollama_status['models']}")
-        logger.info(f"🤖 Platform chatbot will use: {best}")
-    elif not local_api_status:
-        logger.warning("⚠️  No local AI engine detected (Ollama on 11434 or local API on 8010).")
-        logger.warning("   Start Ollama or your local .gguf server for chatbot functionality.")
+        logger.info(f"🤖 Platform chatbot capable of using: {best}")
+    else:
+        logger.info("ℹ️  No Ollama detected (running native GGUF on 8010).")
 
-    # Background task: cleanup expired sessions every 30s
     async def session_cleanup_loop():
         while True:
             await asyncio.sleep(30)
@@ -283,13 +275,12 @@ async def api_supported_formats():
 #  GGUF Model Server Auto-Start
 # ═══════════════════════════════════════════════════════════
 
-import subprocess
-import platform as _platform
+# ═══════════════════════════════════════════════════════════
+#  GGUF Model Server Direct Mounting (Unifies Ports on 8010)
+# ═══════════════════════════════════════════════════════════
 
-_gguf_server_process = None
-
-def _try_start_gguf_server():
-    """Auto-detect and start llama_cpp server with Qwen GGUF (Priority: 1.5B -> 9B)."""
+def _mount_gguf_server(fastapi_app: FastAPI):
+    """Mounts llama_cpp.server directly onto the main FastAPI instance under /v1."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     model_paths = [
         os.path.join(base_dir, "Qwen3.5-9B-GGUF", "Qwen2.5-1.5B-Instruct-Q4_K_M.gguf"),
@@ -303,65 +294,58 @@ def _try_start_gguf_server():
             break
             
     if not selected_model:
-        logger.error("❌ No GGUF models found in E:\\AgenticRag\\Qwen3.5-9B-GGUF")
-        return None, None
+        logger.error("❌ No GGUF models found in backend/Qwen3.5-9B-GGUF")
+        return
 
-    # Check if server is already running on 8011
     try:
-        resp = requests.get("http://localhost:8011/v1/models", timeout=2)
-        if resp.status_code == 200:
-            models_data = resp.json().get("data", [])
-            model_name = models_data[0]["id"] if models_data else "GGUF-Local"
-            return "http://localhost:8011/v1/chat/completions", model_name
-    except Exception:
-        pass
-
-    # Start llama_cpp.server in background
-    import sys
-    try:
-        logger.info(f"🚀 Auto-starting llama_cpp.server with {selected_model}...")
-        subprocess.Popen(
-            [
-                sys.executable, "-m", "llama_cpp.server",
-                "--model", selected_model,
-                "--host", "0.0.0.0",
-                "--port", "8011",
-                "--n_ctx", "4096",
-                "--n_gpu_layers", "0"  # CPU only for stability on 16GB RAM systems
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+        import llama_cpp.server.settings
+        from llama_cpp.server.app import create_app
+        
+        logger.info(f"🚀 Mounting local GGUF model: {selected_model}")
+        
+        # We don't need network settings since it's mounted, but we must provide them
+        server_settings = llama_cpp.server.settings.ServerSettings(host='0.0.0.0', port=8010)
+        
+        # Configure model settings
+        model_settings = [
+            llama_cpp.server.settings.ModelSettings(
+                model=selected_model,
+                n_ctx=4096,
+                n_gpu_layers=0  # CPU only for stability
+            )
+        ]
+        
+        # Create the sub-application
+        gguf_app = create_app(
+            server_settings=server_settings,
+            model_settings=model_settings
         )
         
-        # Poll for readiness in a background thread to avoid blocking FastAPI startup
-        def poll():
-            import time as _time
-            for _ in range(20):
-                _time.sleep(1)
-                try:
-                    resp = requests.get("http://localhost:8011/v1/models", timeout=2)
-                    if resp.status_code == 200:
-                        logger.info("✅ llama_cpp.server is now ready!")
-                        return
-                except Exception:
-                    continue
-        
-        import threading
-        threading.Thread(target=poll, daemon=True).start()
+        # Mount the sub-app on / so endpoints like /v1/chat/completions work locally
+        # (llama_cpp already prefixes its routes with /v1 internally)
+        fastapi_app.mount("/", gguf_app)
+        logger.info("✅ GGUF model mounted successfully")
         
     except Exception as e:
-        logger.error(f"❌ Failed to start llama_cpp.server: {e}")
-        
-    return None, None
+        logger.error(f"❌ Failed to mount GGUF server: {e}")
 
 
 # ═══════════════════════════════════════════════════════════
 #  AI Interaction Endpoints
 # ═══════════════════════════════════════════════════════════
 
+import re
+
+def _clean_markdown(text: str) -> str:
+    """Removes ** and ## from the LLM responses for cleaner display."""
+    if not text:
+        return ""
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)  # Remove bold tags, keep text
+    text = re.sub(r'##\s*(.*)', r'\n\1', text)      # Remove header tags, keep text
+    return text.strip()
+
 @app.post("/api/chat")
-async def api_chat(req: ChatRequest):
+def api_chat(req: ChatRequest):
     """Session-aware chat: routes to local LLM (Test Mode) or Guide LLM."""
     
     # --- 1. Fast Greeting Check ---
@@ -373,16 +357,17 @@ async def api_chat(req: ChatRequest):
             "session_active": False
         }
 
-    # --- 2. Session-aware routing (Test Mode — direct local LLM) ---
+    # --- 2. Session-aware routing (Test Mode — via direct LLM, but will be refactored to pass through Haystack) ---
     if req.session_id:
         session = get_active_session(req.session_id)
         if session:
             try:
                 remaining = max(0, int(session["expires_in"] - (time.time() - session["created_at"])))
                 
-                # Load stored documents for this RAG as context
-                context = _load_rag_context(session["pipeline_id"])
-                answer = local_test_chat(req.query, context)
+                # We revert to Haystack query_pipeline to utilize the 13 RAG architectures!
+                overrides = req.llm_override or {"model": "qwen-local"}
+                result = query_pipeline(session["pipeline_id"], req.query, llm_override=overrides)
+                answer = _clean_markdown(result.get("answer", "No answer found."))
                 
                 return {
                     "answer": answer,
@@ -403,7 +388,9 @@ async def api_chat(req: ChatRequest):
             pass  # Session expired — fall through to Guide Mode
 
     # --- 3. Guide Mode (default — direct local LLM) ---
-    return _guide_mode_response(req.query)
+    guide_resp = _guide_mode_response(req.query)
+    guide_resp["answer"] = _clean_markdown(guide_resp.get("answer", ""))
+    return guide_resp
 
 
 PLATFORM_KNOWLEDGE = """You are the Neural Assistant for OmniRAG Engine — an expert AI guide helping users build, understand, and deploy custom RAG (Retrieval Augmented Generation) systems.
@@ -569,6 +556,92 @@ async def api_session_status(session_id: str):
     return {"active": False, "remaining_seconds": 0}
 
 
+@app.delete("/api/memory/{pipeline_id}/clear")
+async def api_memory_clear(pipeline_id: str):
+    """Clear memory for an active RAG session."""
+    try:
+        from services.memory_manager import clear_memory
+        clear_memory(pipeline_id)
+        return {"status": "success", "message": "Memory cleared."}
+    except Exception as e:
+        logger.error(f"Error clearing memory: {e}")
+        raise HTTPException(status_code=500, detail="Failed to clear memory")
+
+
+@app.get("/api/export/{pipeline_id}")
+async def api_export_rag(pipeline_id: str):
+    """Export the deployed pipeline configuration and basic frontend into a standalone ZIP."""
+    rag_name = _pipeline_rag_map.get(pipeline_id)
+    if not rag_name:
+        raise HTTPException(status_code=404, detail="Pipeline data not mapped or found.")
+        
+    rag_dir = Path(__file__).parent / "data" / rag_name
+    if not rag_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Data directory {rag_name} not found.")
+
+    export_dir = Path(__file__).parent / "exports"
+    export_dir.mkdir(exist_ok=True)
+    
+    zip_filename = export_dir / f"{rag_name}_export.zip"
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat with RAG: {rag_name}</title>
+    <style>
+        body {{ font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; background: #f4f4f5; }}
+        #chat {{ height: 400px; overflow-y: auto; background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
+        .msg {{ margin-bottom: 12px; padding: 12px; border-radius: 8px; }}
+        .user {{ background: #3b82f6; color: white; margin-left: 40px; }}
+        .bot {{ background: #e4e4e7; color: black; margin-right: 40px; }}
+        .controls {{ display: flex; gap: 10px; }}
+        input {{ flex: 1; padding: 12px; border: 1px solid #d4d4d8; border-radius: 8px; }}
+        button {{ padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; }}
+    </style>
+</head>
+<body>
+    <h2>Chat: {rag_name}</h2>
+    <div id="chat"></div>
+    <div class="controls">
+        <input type="text" id="query" placeholder="Ask a question..." onkeypress="if(event.key === 'Enter') send()" />
+        <button onclick="send()">Send</button>
+    </div>
+    <script>
+        async function send() {{
+            const query = document.getElementById('query').value;
+            if(!query) return;
+            const chat = document.getElementById('chat');
+            chat.innerHTML += `<div class='msg user'>${{query}}</div>`;
+            document.getElementById('query').value = '';
+            try {{
+                const res = await fetch('http://localhost:8010/api/test-chat', {{
+                    method: 'POST',
+                    headers: {{'Content-Type': 'application/json'}},
+                    body: JSON.stringify({{ query: query, pipeline_id: '{pipeline_id}' }})
+                }});
+                const data = await res.json();
+                chat.innerHTML += `<div class='msg bot'>${{data.answer}}</div>`;
+            }} catch(e) {{
+                chat.innerHTML += `<div class='msg bot' style='color:red'>Error connecting to backend</div>`;
+            }}
+            chat.scrollTop = chat.scrollHeight;
+        }}
+    </script>
+</body>
+</html>
+"""
+
+    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        zipf.writestr("index.html", html_content)
+        for root, _, files in os.walk(rag_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, rag_dir)
+                zipf.write(file_path, f"data/{{arcname}}")
+                
+    return FileResponse(zip_filename, filename=f"{rag_name}_export.zip", media_type="application/zip")
+
+
 @app.get("/api/ollama/status")
 async def api_ollama_status():
     """Check Ollama server status and list available models."""
@@ -597,7 +670,7 @@ async def api_ollama_pull(request: dict):
 
 
 @app.post("/api/test-chat")
-async def api_test_chat(req: ChatRequest):
+def api_test_chat(req: ChatRequest):
     """Query endpoint for deployed RAGs — uses direct local LLM with document context."""
     if not req.pipeline_id:
         return {"answer": "Please create a RAG first before testing."}
@@ -610,10 +683,23 @@ async def api_test_chat(req: ChatRequest):
     logger.info(f"Test chat for pipeline {req.pipeline_id}: {req.query}")
     
     try:
-        # Load stored documents as context and call local LLM directly
-        context = _load_rag_context(req.pipeline_id)
-        answer = local_test_chat(req.query, context)
-        return {"answer": answer}
+        # Define overrides for query_pipeline
+        overrides = req.llm_override or {"model": "qwen-local"}
+
+        # Use Haystack query pipeline to route through 13 RAG types deployed locally
+        result = query_pipeline(
+            req.pipeline_id,
+            req.query,
+            audio_base64=req.audio_base64,
+            llm_override=overrides
+        )
+        
+        if isinstance(result, dict):
+            if "answer" in result:
+                result["answer"] = _clean_markdown(result["answer"])
+            return result
+            
+        return {"answer": _clean_markdown(result)}
     except Exception as e:
         logger.error(f"Test chat error: {e}")
         return {"answer": "⚠️ Model temporarily unavailable. Please try again in a moment."}

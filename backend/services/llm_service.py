@@ -14,7 +14,11 @@ from haystack.utils import Secret
 
 logger = logging.getLogger(__name__)
 
-LLM_PORT = 8011  # local llama_cpp server port (moved from 8010)
+# Hardcoded fallback models
+MODEL_FALLBACK_ORDER = ["qwen-local", "mistral-local", "llama3-local"]
+
+LLM_PORT = 8010 # local llama_cpp server port
+OLLAMA_PORT = 11434
 
 
 # ═══════════════════════════════════════════════════════════
@@ -172,6 +176,24 @@ MODEL_CAPABILITIES = {
         "model_size": "auto",
     },
     # ─── Cloud Models ──────────────────────────────────────────────────────
+    "nemotron-online": {
+        "display_name": "Nvidia Nemotron 120B — High Reasoning Fallback",
+        "type": "cloud",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 16384,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+    },
+    "mistral-online": {
+        "display_name": "Nvidia Mistral 119B — AI Fallback",
+        "type": "cloud",
+        "supports_tools": True,
+        "supports_vision": False,
+        "context_window": 16384,
+        "requires_gpu": False,
+        "min_vram_mb": 0,
+    },
     "gpt4o": {
         "display_name": "OpenAI GPT-4o",
         "type": "cloud",
@@ -240,10 +262,10 @@ def validate_model_capabilities(model_id: str) -> dict:
 # ═══════════════════════════════════════════════════════════
 
 FALLBACK_CHAIN = {
-    "qwen-local": ["ollama", "gpt4o"],
-    "mistral-local": ["ollama", "gpt4o"],
-    "llama3-local": ["ollama", "gpt4o"],
-    "deepseek-local": ["ollama", "gpt4o"],
+    "qwen-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
+    "mistral-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
+    "llama3-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
+    "deepseek-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
     "ollama": ["qwen-local", "gpt4o"],
     "gpt4o": ["claude35", "gemini", "qwen-local"],
     "claude35": ["gpt4o", "gemini", "qwen-local"],
@@ -294,6 +316,10 @@ def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Option
     
     if model_id in ("ollama", "ollama-auto") or is_ollama:
         return _ollama_generator(api_key, preferred_model=model_id if ":" in model_id else None)
+    elif model_id == "nemotron-online":
+        return _nvidia_nemotron_generator()
+    elif model_id == "mistral-online":
+        return _nvidia_mistral_generator()
     elif model_id == "gpt4o":
         return _openai_generator(api_key)
     elif model_id == "claude35":
@@ -369,6 +395,36 @@ def _local_deepseek_generator():
         model="deepseek",
         generation_kwargs={"max_tokens": 512, "temperature": 0.3},
         timeout=300.0,
+    )
+
+
+def _nvidia_nemotron_generator():
+    from haystack.components.generators import OpenAIGenerator
+    # Hardcoded test mode fallback
+    key = Secret.from_token("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")
+    return OpenAIGenerator(
+        api_key=key,
+        api_base_url="https://integrate.api.nvidia.com/v1",
+        model="nvidia/nemotron-3-super-120b-a12b",
+        generation_kwargs={
+            "max_tokens": 4096, 
+            "temperature": 0.5,
+            "extra_body": {"chat_template_kwargs": {"enable_thinking": True}, "reasoning_budget": 4096}
+        },
+        timeout=120.0,
+    )
+
+
+def _nvidia_mistral_generator():
+    from haystack.components.generators import OpenAIGenerator
+    # Hardcoded test mode fallback
+    key = Secret.from_token("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")
+    return OpenAIGenerator(
+        api_key=key,
+        api_base_url="https://integrate.api.nvidia.com/v1",
+        model="mistralai/mistral-small-4-119b-2603",
+        generation_kwargs={"max_tokens": 4096, "temperature": 0.5},
+        timeout=120.0,
     )
 
 
