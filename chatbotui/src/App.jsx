@@ -34,53 +34,38 @@ function App() {
 
   // Drag state
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isPosInitialized, setIsPosInitialized] = useState(false);
   const [hasMoved, setHasMoved] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const isMobile = window.innerWidth < 768;
-      // Position in bottom-right corner with a small gap
-      setPosition({
-        x: window.innerWidth - (isMobile ? 80 : 90),
-        y: window.innerHeight - (isMobile ? 80 : 90)
-      });
-      setIsPosInitialized(true);
-
-      const handleResize = () => {
-        setPosition(prev => {
-          const padding = 20;
-          const elWidth = 80 + padding; // Snug around the 60px robot
-          const elHeight = 80 + padding;
-          return {
-            x: Math.max(padding, Math.min(prev.x, window.innerWidth - elWidth)),
-            y: Math.max(padding, Math.min(prev.y, window.innerHeight - elHeight))
-          };
-        });
-      };
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, []);
-
   const handleDragStart = (e) => {
+    const isMobile = window.innerWidth < 768;
+    if (isMobile) return; // Disable dragging on mobile to prevent accidental scrolls
+
     const isTouch = e.type === 'touchstart';
     if (!isTouch && e.button !== 0) return;
 
-    // e.preventDefault(); // Remove to allow click
-    setHasMoved(false);
     setIsDragging(true);
 
     const clientX = isTouch ? e.touches[0].clientX : e.clientX;
     const clientY = isTouch ? e.touches[0].clientY : e.clientY;
 
+    // Use current absolute position if already moved, else calculate from current DOM rect
+    let startPosX = position.x;
+    let startPosY = position.y;
+    
+    if (!hasMoved) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      startPosX = rect.left;
+      startPosY = rect.top;
+      setPosition({ x: startPosX, y: startPosY });
+    }
+
     dragRef.current = {
       startX: clientX,
       startY: clientY,
-      initialX: position.x,
-      initialY: position.y
+      initialX: startPosX,
+      initialY: startPosY
     };
 
     const onMove = (moveEvent) => {
@@ -89,16 +74,15 @@ function App() {
 
       if (Math.abs(currentX - dragRef.current.startX) > 3 || Math.abs(currentY - dragRef.current.startY) > 3) {
         setHasMoved(true);
-        if (moveEvent.type === 'touchmove') moveEvent.preventDefault(); // Prevent scrolling while dragging
+        if (moveEvent.type === 'touchmove') moveEvent.preventDefault();
       }
 
       let newX = dragRef.current.initialX + (currentX - dragRef.current.startX);
       let newY = dragRef.current.initialY + (currentY - dragRef.current.startY);
 
       const padding = 20;
-      const isMobile = window.innerWidth < 768;
-      const elementWidth = (isMobile ? 40 : 80) + padding;
-      const elementHeight = (isMobile ? 40 : 80) + padding;
+      const elementWidth = 80 + padding;
+      const elementHeight = 80 + padding;
 
       newX = Math.max(padding, Math.min(newX, window.innerWidth - elementWidth));
       newY = Math.max(padding, Math.min(newY, window.innerHeight - elementHeight));
@@ -141,7 +125,7 @@ function App() {
   const [isThemeSettingsOpen, setIsThemeSettingsOpen] = useState(false);
   const [themeHue, setThemeHue] = useState(() => {
     const saved = localStorage.getItem('omnirag_theme_hue');
-    return saved ? parseInt(saved) : 190; // Default cyan hue
+    return saved ? parseInt(saved) : 190;
   });
   const [legalModalType, setLegalModalType] = useState(null);
 
@@ -900,8 +884,8 @@ function App() {
         )
       }
 
-      <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 right-0 sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
-        <div className="w-screen sm:w-[420px] h-[75dvh] sm:h-[650px] glass-panel mobile-chat-window sm:rounded-[40px] rounded-t-[30px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
+      <div className={`fixed z-[100] transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] transform origin-bottom-right ${isOpen ? 'bottom-0 left-0 right-0 sm:left-auto sm:bottom-10 sm:right-10 scale-100 opacity-100 translate-y-0' : 'bottom-0 right-0 scale-90 opacity-0 translate-y-8 pointer-events-none'}`}>
+        <div className="w-full sm:w-[420px] h-[75dvh] sm:h-[650px] glass-panel mobile-chat-window sm:rounded-[40px] rounded-t-[30px] flex flex-col shadow-[0_40px_100px_rgba(0,0,0,0.7)] overflow-hidden">
 
           <div className="p-6 border-b border-white/5 flex items-center justify-between bg-white/5 mobile-chat-header">
             <div className="flex items-center gap-4">
@@ -1051,13 +1035,11 @@ function App() {
         </div>
       </div>
 
-      {
-        isPosInitialized && (
-          <div
-            className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
-            style={{ left: position.x, top: position.y }}
-            onMouseDown={handleDragStart}
-            onTouchStart={handleDragStart}
+      <div
+        className={`fixed z-50 group cursor-pointer ${isOpen ? 'scale-0 opacity-0 pointer-events-none transition-all duration-500' : 'scale-100 opacity-100'} ${isDragging ? 'cursor-grabbing' : 'cursor-grab transition-all duration-300'}`}
+        style={hasMoved ? { left: position.x, top: position.y } : { bottom: '30px', right: '30px' }}
+        onMouseDown={handleDragStart}
+        onTouchStart={handleDragStart}
             onClick={() => {
               if (!hasMoved) setIsOpen(true);
             }}
@@ -1069,8 +1051,6 @@ function App() {
               </div>
             </div>
           </div>
-        )
-      }
 
       {/* Observability Dashboard Modal */}
       {
