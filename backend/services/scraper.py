@@ -13,20 +13,16 @@ logger = logging.getLogger(__name__)
 
 
 def scrape_urls(urls, mode="static", max_pages=100):
-    """
-    Scrapes URLs and extracts text content.
-
-    Args:
-        urls: list of URL strings
-        mode: "static" (single page via BS4) or "dynamic" (full-site crawl via Playwright)
-        max_pages: max pages to crawl in dynamic mode (default 50)
-
-    Returns:
-        list of extracted text strings
-    """
     if mode == "dynamic":
         return _scrape_dynamic_fullsite(urls, max_pages=max_pages)
-    return _scrape_static(urls)
+    
+    # Even for static (single page), use Playwright if available to support JS-heavy websites
+    try:
+        from playwright.sync_api import sync_playwright
+        return _scrape_dynamic_fullsite(urls, max_pages=1)
+    except ImportError:
+        logger.warning("Playwright not available — falling back to pure static scraping (JS will not be rendered).")
+        return _scrape_static(urls)
 
 
 def _scrape_static(urls):

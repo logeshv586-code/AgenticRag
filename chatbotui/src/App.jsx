@@ -132,6 +132,30 @@ function App() {
     return saved ? parseInt(saved) : 190;
   });
   const [legalModalType, setLegalModalType] = useState(null);
+  const [isExported, setIsExported] = useState(false);
+
+  useEffect(() => {
+    fetch('/exported_config.json')
+      .then(res => res.ok ? res.json() : null)
+      .then(config => {
+        if (config) {
+          setIsExported(true);
+          setRagConfig({
+            ragType: config.rag_type,
+            dbType: config.db_type,
+            deployData: { pipeline_id: config.pipeline_id, deployment_info: { pipeline_id: config.pipeline_id } },
+            themeHue: 190
+          });
+          setIsOpen(true);
+          setMessages([{
+            id: Date.now(),
+            role: 'bot',
+            content: `Standalone Assistant Ready. Powered by OmniRAG Pipeline: ${config.pipeline_id}`
+          }]);
+        }
+      })
+      .catch(e => console.log('Standard mode'));
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('omnirag_theme_hue', themeHue);
@@ -508,8 +532,9 @@ function App() {
         <div className="aurora-orb orb-2"></div>
       </div>
 
-      <nav className="fixed top-8 left-0 right-0 z-50 flex justify-center px-4">
-        <div className="nav-pill flex items-center justify-between w-full max-w-lg lg:max-w-none lg:w-auto gap-4 lg:gap-12 animate-fade-in-up">
+      {!isExported && (
+        <nav className="fixed top-8 left-0 right-0 z-50 flex justify-center px-4">
+          <div className="nav-pill flex items-center justify-between w-full max-w-lg lg:max-w-none lg:w-auto gap-4 lg:gap-12 animate-fade-in-up">
           <div className="flex items-center gap-3 font-['Syne'] font-bold text-xl tracking-tighter">
             <span className="text-cyan-400">⚡</span> OmniRAG Engine
           </div>
@@ -531,7 +556,8 @@ function App() {
             START BUILDING
           </button>
         </div>
-      </nav>
+        </nav>
+      )}
 
       {/* Mobile Menu Drawer */}
       <div className={`fixed inset-0 z-[100] transition-all duration-500 ${isMobileMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
@@ -554,7 +580,8 @@ function App() {
         </div>
       </div>
 
-      <main className="pt-48 px-6 max-w-7xl mx-auto relative z-10 flex-1 w-full pb-20">
+      {!isExported && (
+        <main className="pt-48 px-6 max-w-7xl mx-auto relative z-10 flex-1 w-full pb-20">
 
         {/* V2 Hero */}
         <header className="text-center mb-16 md:mb-40 animate-fade-in-up">
@@ -858,7 +885,8 @@ function App() {
             <button onClick={() => setLegalModalType('contact')} className="text-xs text-zinc-500 border-none hover:text-white transition cursor-pointer bg-transparent">Contact</button>
           </div>
         </footer>
-      </main>
+        </main>
+      )}
 
       {
         selected && (
@@ -958,10 +986,11 @@ function App() {
               {(ragConfig?.deployData?.pipeline_id || ragConfig?.deployData?.deployment_info?.pipeline_id) && (
                 <button
                   onClick={handleExportZip}
-                  title="Export RAG as ZIP"
-                  className="p-1.5 sm:p-2 hover:bg-white/10 rounded-full transition text-zinc-400 hover:text-white"
+                  title="Export Full Project ZIP"
+                  className="flex items-center gap-1 p-1.5 sm:px-3 sm:py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 hover:text-white rounded-full transition text-xs font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(16,185,129,0.2)] mr-1"
                 >
-                  <DownloadCloud className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <DownloadCloud className="w-4 h-4 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline pt-0.5">Export Project ZIP</span>
                 </button>
               )}
               <button
@@ -1182,10 +1211,11 @@ function App() {
         onComplete={(config) => {
           setRagConfig(config);
           setIsCreateModalOpen(false);
+          const dbName = config.dbType === 'local' ? (config.localDb || 'Chroma') : (config.cloudDb || 'Cloud DB');
           const msg = {
             id: Date.now(),
             role: 'bot',
-            content: `Your ${config.ragType.toUpperCase()} RAG for ${config.useCase} using ${config.vectorDb} is successfully deployed! How can I help you today?`
+            content: `Your ${config.ragType.toUpperCase()} RAG using **${dbName.toUpperCase()}** vector database is successfully deployed! You can test it here, or export the full project as a ZIP containing the backend API, frontend, and knowledge data.`
           };
           setMessages([msg]);
           setIsOpen(true);

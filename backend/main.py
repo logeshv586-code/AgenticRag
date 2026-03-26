@@ -310,8 +310,8 @@ def _mount_gguf_server(fastapi_app: FastAPI):
         model_settings = [
             llama_cpp.server.settings.ModelSettings(
                 model=selected_model,
-                n_ctx=4096,
-                n_threads=16,   # Speed up CPU inference
+                n_ctx=2048,     # Reduced for lower RAM usage
+                n_threads=4,    # Speed up CPU inference but low enough to avoid OOM
                 n_gpu_layers=0  # CPU only for stability
             )
         ]
@@ -346,7 +346,7 @@ def _clean_markdown(text: str) -> str:
     return text.strip()
 
 @app.post("/api/chat")
-def api_chat(req: ChatRequest):
+async def api_chat(req: ChatRequest):
     """Session-aware chat: routes to local LLM (Test Mode) or Guide LLM."""
     
     # --- 1. Fast Greeting Check ---
@@ -392,9 +392,9 @@ def api_chat(req: ChatRequest):
     if not is_model_ready():
         return {"answer": _static_guide_response(req.query), "mode": "guide", "session_active": False}
         
-    def stream_generator():
+    async def stream_generator():
         from services.local_llm import guide_chat_stream
-        for chunk in guide_chat_stream(req.query, PLATFORM_KNOWLEDGE):
+        async for chunk in guide_chat_stream(req.query, PLATFORM_KNOWLEDGE):
             yield chunk
 
     return StreamingResponse(stream_generator(), media_type="text/plain")
@@ -518,7 +518,8 @@ def _guide_mode_response(query: str) -> dict:
         return {"answer": _static_guide_response(query), "mode": "guide", "session_active": False, "model_used": "static-fallback"}
     
     try:
-        answer = local_guide_chat(query, PLATFORM_KNOWLEDGE)
+        import asyncio
+        answer = asyncio.run(local_guide_chat(query, PLATFORM_KNOWLEDGE))
         if answer and "⚠️" not in answer:
             model_info = get_model_info()
             return {"answer": answer, "mode": "guide", "session_active": False, "model_used": model_info.get("id", "local-gguf")}
@@ -591,62 +592,90 @@ async def api_export_rag(pipeline_id: str):
     
     zip_filename = export_dir / f"{rag_name}_export.zip"
     
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-    <title>Chat with RAG: {rag_name}</title>
-    <style>
-        body {{ font-family: system-ui, sans-serif; max-width: 600px; margin: 40px auto; background: #f4f4f5; }}
-        #chat {{ height: 400px; overflow-y: auto; background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-        .msg {{ margin-bottom: 12px; padding: 12px; border-radius: 8px; }}
-        .user {{ background: #3b82f6; color: white; margin-left: 40px; }}
-        .bot {{ background: #e4e4e7; color: black; margin-right: 40px; }}
-        .controls {{ display: flex; gap: 10px; }}
-        input {{ flex: 1; padding: 12px; border: 1px solid #d4d4d8; border-radius: 8px; }}
-        button {{ padding: 12px 24px; background: #10b981; color: white; border: none; border-radius: 8px; cursor: pointer; }}
-    </style>
-</head>
-<body>
-    <h2>Chat: {rag_name}</h2>
-    <div id="chat"></div>
-    <div class="controls">
-        <input type="text" id="query" placeholder="Ask a question..." onkeypress="if(event.key === 'Enter') send()" />
-        <button onclick="send()">Send</button>
-    </div>
-    <script>
-        async function send() {{
-            const query = document.getElementById('query').value;
-            if(!query) return;
-            const chat = document.getElementById('chat');
-            chat.innerHTML += `<div class='msg user'>${{query}}</div>`;
-            document.getElementById('query').value = '';
-            try {{
-                const res = await fetch('http://localhost:8010/api/test-chat', {{
-                    method: 'POST',
-                    headers: {{'Content-Type': 'application/json'}},
-                    body: JSON.stringify({{ query: query, pipeline_id: '{pipeline_id}' }})
-                }});
-                const data = await res.json();
-                chat.innerHTML += `<div class='msg bot'>${{data.answer}}</div>`;
-            }} catch(e) {{
-                chat.innerHTML += `<div class='msg bot' style='color:red'>Error connecting to backend</div>`;
-            }}
-            chat.scrollTop = chat.scrollHeight;
-        }}
-    </script>
-</body>
-</html>
-"""
-
     with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.writestr("index.html", html_content)
-        for root, _, files in os.walk(rag_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, rag_dir)
-                zipf.write(file_path, f"data/{{arcname}}")
+        # Define paths for the entire project
+        project_root = Path(__file__).parent.parent
+        backend_dir = project_root / "backend"
+        frontend_dir = project_root / "chatbotui"
+
+        # Folders and file extensions to exclude from the ZIP
+        exclude_dirs = {'node_modules', '__pycache__', '.git', 'venv', 'env', '.venv', 'dist', 'build', 'exports', 'data'}
+        exclude_exts = {'.pyc', '.pyo', '.log', '.gguf'}
+
+        # 1. Zip the entire backend (excluding 'data' to prevent leaking other RAGs)
+        if backend_dir.exists():
+            for root, dirs, files in os.walk(backend_dir):
+                # Filter out excluded directories
+                dirs[:] = [d for d in dirs if d not in exclude_dirs]
                 
-    return FileResponse(zip_filename, filename=f"{rag_name}_export.zip", media_type="application/zip")
+                for file in files:
+                    file_path = Path(root) / file
+                    if file_path.suffix in exclude_exts or file == zip_filename.name:
+                        continue
+                    
+                    # Store as backend/...
+                    arcname = f"backend/{file_path.relative_to(backend_dir)}"
+                    zipf.write(file_path, arcname)
+
+        # 1b. Explicitly include only the selected RAG data directory
+        if os.path.exists(rag_dir):
+            for root, dirs, files in os.walk(rag_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    # Use the correct path so the exported backend finds it: backend/data/{rag_name}/...
+                    arcname = os.path.relpath(file_path, project_root)
+                    zipf.write(file_path, arcname.replace("\\", "/"))
+
+        # 2. Zip the entire frontend (which includes the 3D robot UI)
+        if frontend_dir.exists():
+            for root, dirs, files in os.walk(frontend_dir):
+                dirs[:] = [d for d in dirs if d not in exclude_dirs]
+                
+                for file in files:
+                    file_path = Path(root) / file
+                    if file_path.suffix in exclude_exts:
+                        continue
+                    
+                    # Store as chatbotui/...
+                    arcname = f"chatbotui/{file_path.relative_to(frontend_dir)}"
+                    zipf.write(file_path, arcname)
+
+        # 2b. Write the exported_config.json so the frontend knows its pipeline details
+        from services.haystack_service import pipeline_metadata
+        import json
+        meta = pipeline_metadata.get(pipeline_id, {})
+        config_data = {
+            "pipeline_id": pipeline_id,
+            "rag_type": meta.get("rag_type", "basic"),
+            "db_type": meta.get("db_type", "local"),
+            "local_db": meta.get("local_db", "chroma"),
+            "cloud_db": meta.get("cloud_db", ""),
+            "theme_hue": meta.get("theme_hue", 190)
+        }
+        zipf.writestr("chatbotui/public/exported_config.json", json.dumps(config_data, indent=2))
+
+        # 3. Add a README with instructions
+        readme_content = f"""# OmniRAG Exported Project: {rag_name}
+
+This ZIP contains the complete source code for your deployed RAG system, including the full backend and the React chatbot UI (with the 3D robot).
+
+## How to run the Backend
+1. cd backend
+2. pip install -r requirements.txt
+3. python main.py
+(The backend runs on http://localhost:8010)
+
+## How to run the Frontend Chatbot UI
+1. cd chatbotui
+2. npm install
+3. npm run dev
+(The frontend will start and connect to your backend)
+
+Enjoy your fully autonomous Neural Assistant!
+"""
+        zipf.writestr("README.md", readme_content)
+
+    return FileResponse(zip_filename, filename=f"{rag_name}_full_project_export.zip", media_type="application/zip")
 
 
 @app.get("/api/ollama/status")

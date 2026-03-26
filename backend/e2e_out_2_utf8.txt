@@ -1,0 +1,63 @@
+﻿e:\AgenticRag\backend\v
+env\Scripts\python : ER
+ROR:services.scraper:Pl
+aywright error: It 
+looks like you are 
+using Playwright Sync 
+API inside the asyncio 
+loop.
+At line:1 char:1
++ e:\AgenticRag\backend
+\venv\Scripts\python 
+test_e2e.py > 
+e2e_out_2.txt ...
++ ~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo     
+         : NotSpecifi  
+  ed: (ERROR:service   
+ s....e asyncio loo    
+p.:String) [], Rem    
+oteException
+    + FullyQualifiedEr 
+   rorId : NativeComm  
+  andError
+ 
+Please use the Async 
+API instead.
+INFO:services.scraper:F
+alling back to static 
+scraping...
+INFO:services.scraper:\
+U0001f4c4 Static 
+scraping: 
+https://psgbiz.com
+INFO:main:Ingested 1 
+URLs for RAG: 
+psg_e2e_test
+INFO:services.security_
+middleware:AUDIT | 
+testclient | POST 
+/api/ingest | role: 
+guest | status: 200
+INFO:httpx:HTTP 
+Request: POST http://te
+stserver/api/ingest 
+"HTTP/1.1 200 OK"
+INFO:services.security_
+middleware:AUDIT | 
+testclient | POST 
+/api/deploy | role: 
+guest | status: 422
+INFO:httpx:HTTP 
+Request: POST http://te
+stserver/api/deploy 
+"HTTP/1.1 422 
+Unprocessable Entity"
+--- 1. Testing Ingestion (PSGBiz.com) ---
+Ingestion Complete! Extracted texts count: 0
+
+--- 2. Testing Pipeline Deployment ---
+Deploy failed: {"detail":[{"type":"missing","loc":["body","extracted_texts"],"msg":"Field required","input":{"ragName":"psg_e2e_test","urls":["https://psgbiz.com"],"mode":"static","dbType":"local","localDb":"chroma","cloudDb":"","ragType":"basic","llmModel":"qwen-local","embeddingModel":"bge-local","chunkSize":500,"topK":5,"useReranker":false,"theme":"cyan"}}]}
