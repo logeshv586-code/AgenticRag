@@ -1,0 +1,41 @@
+name: RAG Validation Matrix
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-contracts:
+    name: Backend RAG contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile changed backend modules
+        run: python -m py_compile backend/services/rag_catalog.py backend/services/rag_builder.py backend/test_rag_catalog.py
+      - name: Validate every supported RAG blueprint
+        run: python -m unittest backend/test_rag_catalog.py -v
+
+  frontend-build:
+    name: Customer UI build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbotui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: chatbotui/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Lint frontend
+        run: npm run lint
+      - name: Build frontend
+        run: npm run build
