@@ -9,6 +9,7 @@ import logging
 from typing import Dict
 
 from .haystack_service import build_and_deploy_pipeline
+from .rag_catalog import normalize_rag_type, recommended_profile, validate_deploy_config
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +18,49 @@ DEPLOY_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "d
 os.makedirs(DEPLOY_DIR, exist_ok=True)
 
 
+def _prepare_customer_config(config: dict) -> tuple[dict, dict]:
+    """Resolve model/customer selection and enforce the supported backend contract."""
+    prepared = dict(config)
+    raw_type = prepared.get("ragType", "basic")
+    resolved_type, selection = normalize_rag_type(raw_type)
+
+    # When the UI sends auto::<plain customer request>, the backend owns the final
+    # classification and applies architecture-appropriate safe defaults. This is
+    # intentionally a fallback as the chat UI normally asks the local guide model
+    # for a type first.
+    if str(raw_type).lower().startswith("auto::"):
+        profile = recommended_profile(resolved_type)
+        prepared["dynamicConfig"] = {
+            **profile.get("dynamicConfig", {}),
+            **(prepared.get("dynamicConfig") or {}),
+        }
+        if not prepared.get("features"):
+            prepared["features"] = profile["features"]
+        prepared["chunkSize"] = prepared.get("chunkSize") or profile["chunkSize"]
+        prepared["topK"] = prepared.get("topK") or profile["topK"]
+        if "useReranker" not in prepared:
+            prepared["useReranker"] = profile["useReranker"]
+        prepared["hallucinationGuard"] = prepared.get("hallucinationGuard", profile["hallucinationGuard"])
+        prepared["explainability"] = prepared.get("explainability", profile["explainability"])
+        prepared["streamingResponse"] = prepared.get("streamingResponse", profile["streamingResponse"])
+
+    prepared["ragType"] = resolved_type
+    validation = validate_deploy_config(prepared)
+    validation["selection"] = selection
+    if not validation["valid"]:
+        raise ValueError("Invalid RAG configuration: " + "; ".join(validation["errors"]))
+    return prepared, validation
+
+
 def deploy_rag_system(config: dict) -> Dict:
     """
-    Deploys the RAG system based on user configuration.
+    Deploy the RAG system based on user/model configuration.
+
+    `ragType` may be an explicit supported architecture or `auto::<customer request>`.
+    Auto mode is resolved in the backend before any pipeline is created.
     Supports 'api', 'offline', and 'hybrid' deployment types.
     """
+    config, validation = _prepare_customer_config(config)
     deployment_type = config.get("deploymentType", "api")
     pipeline_id, pipeline = build_and_deploy_pipeline(config)
 
@@ -34,6 +73,12 @@ def deploy_rag_system(config: dict) -> Dict:
         "documents_processed": len(config.get("extracted_texts", [])),
         "total_characters": sum(len(t) for t in config.get("extracted_texts", [])),
         "deployment_type": deployment_type,
+        "selection": validation.get("selection", {}),
+        "validation": {
+            "valid": validation["valid"],
+            "warnings": validation["warnings"],
+            "rag_type": validation["rag_type"],
+        },
     }
 
     # ── API deployment ───────────────────────────────────

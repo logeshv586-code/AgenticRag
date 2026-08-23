@@ -1,0 +1,26 @@
+name: Customer RAG Production Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, feature/chat-first-rag-factory]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chatbotui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: chatbotui/package-lock.json
+      - run: npm ci
+      - name: Lint chat-first route
+        run: npx eslint src/ChatRagStudio.jsx src/main.jsx --rule 'no-unused-vars: warn'
+      - name: Compile production frontend
+        run: npm run build

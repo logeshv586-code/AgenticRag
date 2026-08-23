@@ -1,125 +1,124 @@
-import requests
+"""Live runtime validation matrix for every supported RAG architecture.
+
+Run while the backend is running on port 8010. This test intentionally avoids
+external websites: each pipeline is built from the same local fixture text and
+then queried through the real /api/test-chat endpoint.
+"""
 import json
 import time
+from pathlib import Path
+
+import requests
+
+from services.rag_catalog import SUPPORTED_RAG_TYPES, recommended_profile
 
 BASE_URL = "http://localhost:8010"
-URLS = ["https://eratimbers.com/"]
-DB_TYPE = "local"
-LOCAL_DB = "chroma"
-LLM = "qwen-local"
-
-RAG_TYPES = [
-    "basic",
-    "conversational",
-    "multimodal",
-    "structured",
-    "agentic",
-    "realtime",
-    "personalized",
-    "crosslingual",
-    "voice",
-    "citation"
+OUTPUT = Path(__file__).with_name("test_all_rags_output.json")
+FIXTURE_TEXTS = [
+    "Acme Support Policy: Standard support is available Monday to Friday. Critical incidents are handled 24/7.",
+    "Acme Product Guide: Model AX-10 includes a two-year warranty. Warranty claims require the product serial number.",
+    "Acme SOP: For invoice exceptions, verify the purchase order, goods receipt, and supplier invoice before escalation.",
 ]
 
-def log(msg):
-    print(msg)
 
-def test_ingest(rag_name):
-    res = requests.post(f"{BASE_URL}/api/ingest", json={
-        "ragName": rag_name,
-        "urls": URLS,
-        "mode": "static"
-    })
-    res.raise_for_status()
-    return res.json()
-
-def test_deploy(rag_type, rag_name):
-    config = {
-        "ragName": rag_name,
-        "extracted_texts": [],
+def deploy_payload(rag_type: str) -> dict:
+    profile = recommended_profile(rag_type)
+    return {
+        "ragName": f"RuntimeMatrix-{rag_type}",
+        "extracted_texts": FIXTURE_TEXTS,
         "ragType": rag_type,
-        "dbType": DB_TYPE,
+        "dbType": "local",
         "cloudDb": "",
-        "localDb": LOCAL_DB,
-        "llmModel": LLM,
+        "localDb": "chroma",
+        "dynamicConfig": profile["dynamicConfig"],
+        "llmModel": "qwen-local",
         "embeddingModel": "bge-local",
-        "chunkSize": 500,
-        "topK": 3,
-        "useReranker": False,
+        "chunkSize": profile["chunkSize"],
+        "topK": profile["topK"],
+        "useReranker": profile["useReranker"],
         "theme": "cyan",
-        "dynamicConfig": {
-            "sourceLanguage": "auto",
-            "targetLanguage": "English",
-            "voiceLanguage": "en-US",
-            "historyLength": 5,
-            "modalities": ["text", "images"],
-            "entityTypes": ["Organization", "Product"],
-            "relationshipDepth": 2,
-            "refreshInterval": 60,
-            "profileFields": ["Role"],
-            "citationStyle": "inline"
-        }
+        "features": profile["features"],
+        "deploymentType": "api",
+        "apiKeys": {},
+        "privacyMode": True,
+        "explainability": profile["explainability"],
+        "scrapeMode": "static",
+        "tuningPreset": profile["tuningPreset"],
+        "hallucinationGuard": profile["hallucinationGuard"],
+        "toxicityFilter": False,
+        "structuredOutput": False,
+        "streamingResponse": profile["streamingResponse"],
     }
-    res = requests.post(f"{BASE_URL}/api/deploy", json=config)
-    res.raise_for_status()
-    return res.json().get('pipeline_id')
 
-def test_chat(pipeline_id, rag_type):
-    query = "What kind of products does Era Timbers offer?"
-    payload = {
-        "pipeline_id": pipeline_id,
-        "query": query
-    }
-    # Provide a dummy 1-byte base64 audio string just in case voice strictly requires it
-    # But usually speech/text should gracefully fallback to query if audio isn't provided.
-    if rag_type == "voice":
-        payload["audio_base64"] = "" 
-        
-    res = requests.post(f"{BASE_URL}/api/test-chat", json=payload)
-    res.raise_for_status()
-    return res.json()
 
-def main():
-    rag_name_base = "EraTimbersTest"
-    
-    with open("test_all_rags_output.txt", "w", encoding="utf-8") as f:
-        f.write("=== RAG TYPES TEST ===\n")
-        
-    log("\n--- Executing Base Ingest ---")
+def validate_one(rag_type: str) -> dict:
+    started = time.time()
+    result = {"rag_type": rag_type, "deploy": "failed", "query": "not-run", "passed": False}
     try:
-        test_ingest(rag_name_base)
-        log("Ingest OK")
-    except Exception as e:
-        log(f"Ingest Failed: {e}")
-        return
+        deploy = requests.post(f"{BASE_URL}/api/deploy", json=deploy_payload(rag_type), timeout=180)
+        deploy.raise_for_status()
+        deploy_data = deploy.json()
+        pipeline_id = deploy_data.get("pipeline_id") or deploy_data.get("deployment_info", {}).get("pipeline_id")
+        if not pipeline_id:
+            raise RuntimeError("deployment did not return pipeline_id")
+        result.update({
+            "deploy": "passed",
+            "pipeline_id": pipeline_id,
+            "resolved_type": deploy_data.get("deployment_info", {}).get("type"),
+            "backend_validation": deploy_data.get("deployment_info", {}).get("validation"),
+        })
 
-    for r_type in RAG_TYPES:
-        log(f"\n--- Testing {r_type.upper()} ---")
-        
-        try:
-            pid = test_deploy(r_type, rag_name_base)
-            if not pid:
-                raise Exception("Deployment returned missing info.")
-            log(f"Deploy OK -> {pid}")
-        except Exception as e:
-            err = str(e)
-            if hasattr(e, 'response') and e.response is not None:
-                err += f" | {e.response.text}"
-            log(f"Deploy Failed: {err}")
-            with open("test_all_rags_output.txt", "a", encoding="utf-8") as f:
-                f.write(f"[{r_type.upper()}] DEPLOY FAILED: {err}\n\n")
-            continue
-            
-        try:
-            resp = test_chat(pid, r_type)
-            ans = str(resp.get('answer'))[:200].replace('\n', ' ')
-            log(f"Chat OK -> {ans}...")
-            with open("test_all_rags_output.txt", "a", encoding="utf-8") as f:
-                f.write(f"[{r_type.upper()}] SUCCESS:\n{resp.get('answer')}\n\n")
-        except Exception as e:
-            log(f"Chat Failed: {e}")
-            with open("test_all_rags_output.txt", "a", encoding="utf-8") as f:
-                f.write(f"[{r_type.upper()}] CHAT FAILED: {e}\n\n")
+        query = requests.post(
+            f"{BASE_URL}/api/test-chat",
+            json={
+                "pipeline_id": pipeline_id,
+                "query": "What warranty does model AX-10 have? Answer only from the supplied knowledge and cite the evidence when supported.",
+                **({"audio_base64": ""} if rag_type == "voice" else {}),
+            },
+            timeout=180,
+        )
+        query.raise_for_status()
+        query_data = query.json()
+        answer = str(query_data.get("answer") or "").strip()
+        query_passed = bool(answer) and not answer.startswith("⚠️") and "please create a rag" not in answer.lower()
+        result.update({
+            "query": "passed" if query_passed else "failed",
+            "answer_preview": answer[:500],
+            "passed": query_passed,
+        })
+    except Exception as exc:
+        result["error"] = str(exc)
+    result["seconds"] = round(time.time() - started, 2)
+    return result
 
-if __name__ == '__main__':
-    main()
+
+def main() -> int:
+    try:
+        health = requests.get(f"{BASE_URL}/health", timeout=10)
+        health.raise_for_status()
+    except Exception as exc:
+        print(f"Backend is not ready at {BASE_URL}: {exc}")
+        return 2
+
+    results = []
+    print(f"Validating {len(SUPPORTED_RAG_TYPES)} RAG architectures against the live backend…")
+    for rag_type in SUPPORTED_RAG_TYPES:
+        print(f"\n[{rag_type}] build + query")
+        result = validate_one(rag_type)
+        results.append(result)
+        print("PASS" if result["passed"] else f"FAIL: {result.get('error') or result.get('answer_preview', '')[:160]}")
+
+    summary = {
+        "total": len(results),
+        "passed": sum(1 for item in results if item["passed"]),
+        "failed": sum(1 for item in results if not item["passed"]),
+        "results": results,
+    }
+    OUTPUT.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    print(f"\nRuntime matrix: {summary['passed']}/{summary['total']} passed")
+    print(f"Report: {OUTPUT}")
+    return 0 if summary["failed"] == 0 else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
