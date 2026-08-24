@@ -1,0 +1,13 @@
+/* Unified full-engine + global Autopilot refinements */
+
+.omnirag-global-autopilot input,
+.omnirag-global-autopilot textarea,
+.omnirag-global-autopilot button {
+  font: inherit;
+}
+
+@media (max-width: 640px) {
+  .omnirag-global-autopilot {
+    bottom: 10px;
+  }
+}
