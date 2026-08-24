@@ -9,31 +9,46 @@ sentence-transformers
 pytesseract
 Pillow
 requests
-haystack-ai
+# The backend is implemented against Haystack 2.x. Pin the last stable 2.x release
+# so a customer install cannot silently jump to Haystack 3.x.
+haystack-ai==2.31.0
 haystack-experimental
 lxml
 python-docx
+PyYAML
+
+# === Local vector stores ===
 chromadb
 chroma-haystack
 faiss-cpu
 faiss-haystack
-anthropic
-playwright
-pinecone-client
+
+# === Cloud / enterprise vector stores ===
 qdrant-client
+qdrant-haystack==10.4.0
 elasticsearch
-# === Phase 1: Modular Backend ===
+elasticsearch-haystack
+pinecone-client
+pinecone-haystack
+weaviate-client
+weaviate-haystack
+# Optional customer-managed stores:
+# pgvector-haystack
+# redis-haystack
+
+# === LLM providers / local runtime ===
+anthropic
+llama-cpp-python
+
+# === Web + visual monitoring ===
+playwright
+
+# === Specialized RAG modules ===
 langdetect
 deep-translator
 edge-tts
 networkx
-# === Multimodal Support ===
-faster-whisper          # Local Whisper STT (audio transcription, no cloud)
-pydub                   # Audio format conversion (mp3/m4a/ogg → wav)
-SpeechRecognition       # Audio helpers
-# openai-whisper        # Alternative Whisper backend (larger, slower)
-# === Phase 2: Database Layer ===
-# pgvector-haystack  # Optional: PGVector integration
-# redis-haystack     # Optional: Redis vector search
-# === Phase 3: Model Layer ===
-# ollama             # Managed via ollama.ai (install separately)
+faster-whisper
+pydub
+SpeechRecognition
+# openai-whisper  # Alternative Whisper backend (larger, slower)
