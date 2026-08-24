@@ -11,9 +11,25 @@ venv/
 .venv/
 backend/venv/
 
-# Environment variables
+# ========================
+# 🔐 Secrets & environment variables
+# ========================
+# Never commit real credentials. Keep only the documented placeholder file.
 .env
 .env.*
+!.env.example
+*.env
+*.env.local
+*.secret
+*.secrets
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+service-account*.json
 
 # ========================
 # 📦 Models & AI Data (IMPORTANT)
