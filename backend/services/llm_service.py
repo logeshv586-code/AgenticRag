@@ -30,7 +30,7 @@ MODEL_CAPABILITIES: Dict[str, dict] = {
     "gemma3:27b": {"display_name": "Gemma 3 via Ollama", "type": "local", "supports_tools": False, "supports_vision": True, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0},
     "gpt4o": {"display_name": "OpenAI GPT-4o", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 128000, "requires_gpu": False, "min_vram_mb": 0},
     "claude35": {"display_name": "Anthropic Claude 3.5 Sonnet", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 200000, "requires_gpu": False, "min_vram_mb": 0},
-    "gemini": {"display_name": "Google Gemini", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 1000000, "requires_gpu": False, "min_vram_mb": 0},
+    "gemini": {"display_name": "Google Gemini 3.7 Flash", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 1000000, "requires_gpu": False, "min_vram_mb": 0},
     "mistral-online": {"display_name": "Mistral API", "type": "cloud", "supports_tools": True, "supports_vision": False, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
     "nemotron-online": {"display_name": "NVIDIA Nemotron", "type": "cloud", "supports_tools": True, "supports_vision": False, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
 }
@@ -168,21 +168,6 @@ def _anthropic_generator(api_key: Optional[str]):
     )
 
 
-def _gemini_generator(api_key: Optional[str]):
-    try:
-        from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
-    except ImportError as exc:
-        raise RuntimeError("Gemini selected but google-ai-haystack is not installed") from exc
-    token = api_key or os.getenv("GOOGLE_API_KEY")
-    if not token:
-        raise RuntimeError("GOOGLE_API_KEY is required")
-    return GoogleAIGeminiGenerator(
-        api_key=Secret.from_token(token),
-        model="gemini-2.0-flash",
-        generation_kwargs={"max_output_tokens": 1024, "temperature": 0.3},
-    )
-
-
 def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
     """Return a generator or raise a truthful configuration error."""
     if base_url:
@@ -205,7 +190,8 @@ def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Option
     if model_id == "claude35":
         return _anthropic_generator(api_key)
     if model_id == "gemini":
-        return _gemini_generator(api_key)
+        token = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+        return _openai_compatible("gemini-3.7-flash", "https://generativelanguage.googleapis.com/v1beta/openai/", token or "")
     if model_id == "mistral-online":
         token = api_key or os.getenv("MISTRAL_API_KEY")
         return _openai_compatible("mistral-small-latest", "https://api.mistral.ai/v1", token or "")
