@@ -26,8 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Compile production backend modules
@@ -53,25 +53,37 @@ jobs:
         run: python -m unittest backend/test_security_contract.py -v
 
   frontend-build:
-    name: Customer Autopilot UI build
+    name: Lightweight customer UI certification
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
       run:
         working-directory: chatbotui
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: chatbotui/package-lock.json
       - name: Install frontend dependencies
-        run: npm ci
-      - name: Lint customer route with zero warnings
-        run: npx eslint src/ChatRagStudio.jsx src/main.jsx --max-warnings=0
+        run: npm ci --no-audit --no-fund
+      - name: Block high-severity production dependency findings
+        run: npm run audit:prod
+      - name: Lint customer and lightweight analytics routes with zero warnings
+        run: npx eslint src/ChatRagStudio.jsx src/main.jsx src/components/RagAnalyticsDashboard.jsx --max-warnings=0
+      - name: Confirm Plotly is not a runtime dependency
+        run: node -e "const p=require('./package.json'); const d=p.dependencies||{}; if(d['plotly.js']||d['react-plotly.js']) process.exit(1); console.log('PASS: no Plotly runtime dependency')"
       - name: Build complete frontend
         run: npm run build
+      - name: Enforce JavaScript bundle budget
+        run: >-
+          node -e "const fs=require('fs'),p=require('path');
+          const dir='dist/assets';
+          const files=fs.readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>({f,b:fs.statSync(p.join(dir,f)).size})).sort((a,b)=>b.b-a.b);
+          const largest=files[0];
+          console.log('Largest JS chunk:', largest.f, Math.round(largest.b/1024)+' KiB');
+          if(largest.b>700*1024){console.error('Bundle budget exceeded: 700 KiB');process.exit(1)}"
 
   pr-certification:
     name: PR source + build certified
@@ -80,7 +92,7 @@ jobs:
     steps:
       - name: Record certification gate
         run: |
-          echo "CERTIFIED: source contracts, 11-type catalog, Autopilot contracts, secret/store safety, customer lint, and full frontend build passed."
+          echo "CERTIFIED: backend contracts, 11-type catalog, Autopilot contracts, secret/store safety, zero-warning customer lint, production dependency audit, lightweight bundle budget, and full frontend build passed."
           echo "Runtime deployment certification is intentionally separate and must execute backend/test_all_rags.py against real model/embedding/vector services."
 
   live-runtime-certification:
@@ -89,7 +101,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify prepared backend is healthy
         run: python -c "import requests; r=requests.get('http://localhost:8010/health', timeout=10); r.raise_for_status(); print(r.json())"
       - name: Run real 11/11 build + query matrix
