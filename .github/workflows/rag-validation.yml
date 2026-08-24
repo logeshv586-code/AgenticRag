@@ -56,6 +56,8 @@ jobs:
     name: Lightweight customer UI certification
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: chatbotui
@@ -68,12 +70,18 @@ jobs:
           cache-dependency-path: chatbotui/package-lock.json
       - name: Regenerate lockfile for patched dependency graph
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Upload regenerated lockfile
-        uses: actions/upload-artifact@v4
-        with:
-          name: chatbotui-package-lock-${{ github.sha }}
-          path: chatbotui/package-lock.json
-          if-no-files-found: error
+      - name: Commit regenerated lockfile to feature branch
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feature/self-developing-rag-autopilot' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet package-lock.json; then
+            echo "package-lock.json already synchronized"
+          else
+            git add package-lock.json
+            git commit -m "chore: sync patched frontend lockfile"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
       - name: Install frontend dependencies
         run: npm ci --no-audit --no-fund
       - name: Block high-severity production dependency findings
@@ -113,7 +121,7 @@ jobs:
         run: python test_all_rags.py
       - name: Upload runtime certification report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: rag-runtime-certification-${{ github.sha }}
           path: backend/test_all_rags_output.json
