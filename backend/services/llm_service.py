@@ -1,35 +1,42 @@
+"""Secure LLM generator factory for OmniRAG.
+
+Provider credentials are accepted from the current request or environment only.
+No production credential is embedded in source code and unavailable providers fail
+clearly rather than silently claiming a cloud fallback worked.
 """
-LLM Service — Factory for creating LLM generator components.
-Supports local (Qwen, Mistral, Llama 3, DeepSeek via llama_cpp),
-Ollama integration, and cloud (OpenAI, Anthropic, Gemini).
-Includes model capability validation, GPU detection, and automatic fallback.
-"""
+from __future__ import annotations
+
 import logging
 import os
-import shutil
-import requests
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
 
+import requests
 from haystack.utils import Secret
 
 logger = logging.getLogger(__name__)
-
-# Hardcoded fallback models
-MODEL_FALLBACK_ORDER = ["qwen-local", "mistral-local", "llama3-local"]
-
-LLM_PORT = 8010 # local llama_cpp server port
+LLM_PORT = 8010
 OLLAMA_PORT = 11434
 
+MODEL_CAPABILITIES: Dict[str, dict] = {
+    "qwen-local": {"display_name": "Qwen local GGUF", "type": "local", "supports_tools": False, "supports_vision": False, "context_window": 4096, "requires_gpu": False, "min_vram_mb": 0},
+    "mistral-local": {"display_name": "Mistral local GGUF", "type": "local", "supports_tools": False, "supports_vision": False, "context_window": 4096, "requires_gpu": False, "min_vram_mb": 0},
+    "llama3-local": {"display_name": "Llama 3 local GGUF", "type": "local", "supports_tools": True, "supports_vision": False, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0},
+    "deepseek-local": {"display_name": "DeepSeek local GGUF", "type": "local", "supports_tools": True, "supports_vision": False, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0},
+    "ollama": {"display_name": "Ollama Auto", "type": "local", "supports_tools": True, "supports_vision": True, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
+    "ollama-auto": {"display_name": "Ollama Auto", "type": "local", "supports_tools": True, "supports_vision": True, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
+    "llama3.1:8b": {"display_name": "Llama 3.1 8B via Ollama", "type": "local", "supports_tools": True, "supports_vision": False, "context_window": 131072, "requires_gpu": False, "min_vram_mb": 0},
+    "qwen2.5:7b": {"display_name": "Qwen 2.5 7B via Ollama", "type": "local", "supports_tools": True, "supports_vision": False, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
+    "llava:13b": {"display_name": "LLaVA via Ollama", "type": "local", "supports_tools": False, "supports_vision": True, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0},
+    "gemma3:27b": {"display_name": "Gemma 3 via Ollama", "type": "local", "supports_tools": False, "supports_vision": True, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0},
+    "gpt4o": {"display_name": "OpenAI GPT-4o", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 128000, "requires_gpu": False, "min_vram_mb": 0},
+    "claude35": {"display_name": "Anthropic Claude 3.5 Sonnet", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 200000, "requires_gpu": False, "min_vram_mb": 0},
+    "gemini": {"display_name": "Google Gemini", "type": "cloud", "supports_tools": True, "supports_vision": True, "context_window": 1000000, "requires_gpu": False, "min_vram_mb": 0},
+    "mistral-online": {"display_name": "Mistral API", "type": "cloud", "supports_tools": True, "supports_vision": False, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
+    "nemotron-online": {"display_name": "NVIDIA Nemotron", "type": "cloud", "supports_tools": True, "supports_vision": False, "context_window": 32768, "requires_gpu": False, "min_vram_mb": 0},
+}
 
-# ═══════════════════════════════════════════════════════════
-#  GPU & Capability Detection
-# ═══════════════════════════════════════════════════════════
 
 def detect_gpu_availability() -> dict:
-    """
-    Detect GPU availability for local model inference.
-    Returns dict with cuda, rocm, metal, and vram info.
-    """
     result = {
         "cuda_available": False,
         "rocm_available": False,
@@ -38,577 +45,205 @@ def detect_gpu_availability() -> dict:
         "vram_mb": 0,
         "recommended_quantization": "Q4_K_M",
     }
-
-    # Check CUDA (NVIDIA)
     try:
         import torch
         if torch.cuda.is_available():
             result["cuda_available"] = True
             result["gpu_name"] = torch.cuda.get_device_name(0)
-            result["vram_mb"] = torch.cuda.get_device_properties(0).total_mem // (1024 * 1024)
+            result["vram_mb"] = torch.cuda.get_device_properties(0).total_memory // (1024 * 1024)
             if result["vram_mb"] >= 16000:
                 result["recommended_quantization"] = "Q6_K"
-            elif result["vram_mb"] >= 8000:
-                result["recommended_quantization"] = "Q4_K_M"
-            else:
+            elif result["vram_mb"] < 8000:
                 result["recommended_quantization"] = "Q3_K_L"
-    except ImportError:
+    except Exception:
         pass
-
-    # Check Metal (Apple Silicon)
     try:
         import platform
         if platform.system() == "Darwin" and platform.machine() == "arm64":
             result["metal_available"] = True
-            if not result["gpu_name"]:
-                result["gpu_name"] = "Apple Silicon"
+            result["gpu_name"] = result["gpu_name"] or "Apple Silicon"
     except Exception:
         pass
-
     return result
 
 
-# ═══════════════════════════════════════════════════════════
-#  Model Capability Validation
-# ═══════════════════════════════════════════════════════════
-
-MODEL_CAPABILITIES = {
-    # ─── Local via Ollama (30-40GB server models) ──────────────────────────
-    "ollama-auto": {
-        "display_name": "Ollama Auto (Best Available)",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": True,
-        "context_window": 32768,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "auto",
-    },
-    "mixtral:8x7b": {
-        "display_name": "Mixtral 8x7B (26GB) — Best All-Round",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 32768,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "26GB",
-    },
-    "qwen2.5:72b": {
-        "display_name": "Qwen 2.5 72B (44GB) — Best Multilingual",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 32768,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "44GB",
-    },
-    "llama3.1:70b": {
-        "display_name": "LLaMA 3.1 70B Q2 (26GB) — Deep Reasoning",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 131072,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "26GB",
-    },
-    "llava:34b": {
-        "display_name": "LLaVA 34B (20GB) — Vision + Text",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": True,
-        "context_window": 8192,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "20GB",
-    },
-    "gemma3:27b": {
-        "display_name": "Gemma 3 27B (17GB) — Multimodal",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": True,
-        "context_window": 8192,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "17GB",
-    },
-    "llama3.1:8b": {
-        "display_name": "LLaMA 3.1 8B (5GB) — Fast / Lightweight",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 131072,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "5GB",
-    },
-    # ─── Legacy llama_cpp local models (kept for backward compatibility) ───
-    "qwen-local": {
-        "display_name": "Qwen 2.5 14B (local .gguf)",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": False,
-        "context_window": 4096,
-        "requires_gpu": False,
-        "min_vram_mb": 6000,
-        "model_size": "8GB",
-    },
-    "mistral-local": {
-        "display_name": "Mistral 7B (local .gguf)",
-        "type": "local",
-        "supports_tools": False,
-        "supports_vision": False,
-        "context_window": 4096,
-        "requires_gpu": False,
-        "min_vram_mb": 4000,
-        "model_size": "4GB",
-    },
-    "ollama": {
-        "display_name": "Ollama (Auto-detect)",
-        "type": "local",
-        "supports_tools": True,
-        "supports_vision": True,
-        "context_window": 8192,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-        "model_size": "auto",
-    },
-    # ─── Cloud Models ──────────────────────────────────────────────────────
-    "nemotron-online": {
-        "display_name": "Nvidia Nemotron 120B — High Reasoning Fallback",
-        "type": "cloud",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 16384,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-    },
-    "mistral-online": {
-        "display_name": "Nvidia Mistral 119B — AI Fallback",
-        "type": "cloud",
-        "supports_tools": True,
-        "supports_vision": False,
-        "context_window": 16384,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-    },
-    "gpt4o": {
-        "display_name": "OpenAI GPT-4o",
-        "type": "cloud",
-        "supports_tools": True,
-        "supports_vision": True,
-        "context_window": 128000,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-    },
-    "claude35": {
-        "display_name": "Anthropic Claude 3.5",
-        "type": "cloud",
-        "supports_tools": True,
-        "supports_vision": True,
-        "context_window": 200000,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-    },
-    "gemini": {
-        "display_name": "Google Gemini Pro",
-        "type": "cloud",
-        "supports_tools": True,
-        "supports_vision": True,
-        "context_window": 1000000,
-        "requires_gpu": False,
-        "min_vram_mb": 0,
-    },
-}
+def _check_ollama_running() -> tuple[bool, str]:
+    try:
+        response = requests.get(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=3)
+        response.raise_for_status()
+        names = [m.get("name", "") for m in response.json().get("models", [])]
+        return True, f"Ollama running with {len(names)} model(s)"
+    except Exception as exc:
+        return False, f"Ollama unavailable: {exc}"
 
 
 def validate_model_capabilities(model_id: str) -> dict:
-    """
-    Check if a model is available and compatible with the system.
-    Returns {available: bool, capabilities: dict, warnings: list}.
-    """
     caps = MODEL_CAPABILITIES.get(model_id)
+    if not caps and (":" in model_id or any(x in model_id.lower() for x in ("llama", "qwen", "mistral", "gemma", "llava", "phi", "deepseek"))):
+        caps = {"display_name": model_id, "type": "local", "supports_tools": True, "supports_vision": False, "context_window": 8192, "requires_gpu": False, "min_vram_mb": 0}
     if not caps:
         return {"available": False, "capabilities": {}, "warnings": [f"Unknown model: {model_id}"]}
-
     warnings = []
     available = True
-
-    if caps["type"] == "local":
-        gpu = detect_gpu_availability()
-        if caps["min_vram_mb"] > 0 and gpu["vram_mb"] < caps["min_vram_mb"]:
-            warnings.append(
-                f"Model needs ~{caps['min_vram_mb']}MB VRAM. "
-                f"Detected {gpu['vram_mb']}MB. Performance may be slow (CPU mode)."
-            )
-
-        if model_id == "ollama":
-            # Check if Ollama is running
-            available, msg = _check_ollama_running()
-            if not available:
-                warnings.append(msg)
-
-    return {
-        "available": available,
-        "capabilities": caps,
-        "warnings": warnings,
-    }
-
-
-# ═══════════════════════════════════════════════════════════
-#  Automatic Fallback Chain
-# ═══════════════════════════════════════════════════════════
-
-FALLBACK_CHAIN = {
-    "qwen-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
-    "mistral-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
-    "llama3-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
-    "deepseek-local": ["nemotron-online", "mistral-online", "ollama", "gpt4o"],
-    "ollama": ["qwen-local", "gpt4o"],
-    "gpt4o": ["claude35", "gemini", "qwen-local"],
-    "claude35": ["gpt4o", "gemini", "qwen-local"],
-    "gemini": ["gpt4o", "claude35", "qwen-local"],
-}
+    if model_id in ("ollama", "ollama-auto") or ":" in model_id:
+        available, message = _check_ollama_running()
+        if not available:
+            warnings.append(message)
+    if caps["type"] == "cloud":
+        env_map = {
+            "gpt4o": "OPENAI_API_KEY",
+            "claude35": "ANTHROPIC_API_KEY",
+            "gemini": "GOOGLE_API_KEY",
+            "mistral-online": "MISTRAL_API_KEY",
+            "nemotron-online": "NVIDIA_API_KEY",
+        }
+        env_name = env_map.get(model_id)
+        if env_name and not os.getenv(env_name):
+            warnings.append(f"{env_name} is not configured; provide a request key or environment secret before use.")
+    return {"available": available, "capabilities": caps, "warnings": warnings}
 
 
 def get_fallback_model(model_id: str) -> Optional[str]:
-    """Get the next fallback model if the primary is unavailable."""
-    # Always prefer local qwen for this project
+    """Prefer a customer-controlled local provider; no hidden paid-provider fallback."""
+    if model_id != "ollama-auto":
+        running, _ = _check_ollama_running()
+        if running:
+            return "ollama-auto"
     return "qwen-local"
 
 
-# ═══════════════════════════════════════════════════════════
-#  Generator Factory
-# ═══════════════════════════════════════════════════════════
+def _openai_compatible(model: str, api_base_url: str, token: str, max_tokens: int = 1024, temperature: float = 0.3):
+    from haystack.components.generators import OpenAIGenerator
+    if not token:
+        raise RuntimeError(f"An API credential is required for {api_base_url}")
+    return OpenAIGenerator(
+        api_key=Secret.from_token(token),
+        api_base_url=api_base_url,
+        model=model,
+        generation_kwargs={"max_tokens": max_tokens, "temperature": temperature},
+        timeout=300.0,
+    )
+
+
+def _local_gguf_generator(model: str):
+    return _openai_compatible(model, f"http://localhost:{LLM_PORT}/v1", "sk-no-key-required", max_tokens=1024)
+
+
+def _best_ollama_model(preferred: Optional[str] = None) -> str:
+    fallback = preferred or "llama3.1:8b"
+    try:
+        response = requests.get(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=3)
+        response.raise_for_status()
+        names = [m.get("name", "") for m in response.json().get("models", []) if m.get("name")]
+        if preferred and any(preferred == name or preferred in name for name in names):
+            return next(name for name in names if preferred == name or preferred in name)
+        for family in ("qwen2.5", "llama3.1", "llama3", "gemma3", "mistral", "deepseek", "phi3"):
+            for name in names:
+                if family in name.lower():
+                    return name
+        if names:
+            return names[0]
+    except Exception:
+        pass
+    return fallback
+
+
+def _ollama_generator(preferred: Optional[str] = None):
+    model = _best_ollama_model(preferred)
+    return _openai_compatible(model, f"http://localhost:{OLLAMA_PORT}/v1", "ollama", max_tokens=1024, temperature=0.4)
+
+
+def _anthropic_generator(api_key: Optional[str]):
+    try:
+        from haystack_integrations.components.generators.anthropic import AnthropicGenerator
+    except ImportError as exc:
+        raise RuntimeError("Anthropic selected but anthropic-haystack is not installed") from exc
+    token = api_key or os.getenv("ANTHROPIC_API_KEY")
+    if not token:
+        raise RuntimeError("ANTHROPIC_API_KEY is required")
+    return AnthropicGenerator(
+        api_key=Secret.from_token(token),
+        model="claude-3-5-sonnet-20241022",
+        generation_kwargs={"max_tokens": 1024, "temperature": 0.3},
+    )
+
+
+def _gemini_generator(api_key: Optional[str]):
+    try:
+        from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
+    except ImportError as exc:
+        raise RuntimeError("Gemini selected but google-ai-haystack is not installed") from exc
+    token = api_key or os.getenv("GOOGLE_API_KEY")
+    if not token:
+        raise RuntimeError("GOOGLE_API_KEY is required")
+    return GoogleAIGeminiGenerator(
+        api_key=Secret.from_token(token),
+        model="gemini-2.0-flash",
+        generation_kwargs={"max_output_tokens": 1024, "temperature": 0.3},
+    )
+
 
 def get_generator(model_id: str, api_key: Optional[str] = None, base_url: Optional[str] = None):
-    """
-    Factory: return the right Haystack generator based on user selection.
-    Supports llm_override via api_key + base_url for user-provided LLMs.
-    """
-    # If user provided a custom base_url, route to that OpenAI-compatible endpoint
+    """Return a generator or raise a truthful configuration error."""
     if base_url:
-        from haystack.components.generators import OpenAIGenerator
-        key = Secret.from_token(api_key) if api_key else Secret.from_token("sk-no-key")
-        return OpenAIGenerator(
-            api_key=key,
-            api_base_url=base_url,
-            model=model_id,
-            generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
-            timeout=300.0,
-        )
-
-    # Prioritize local GGUF models (checked first)
+        return _openai_compatible(model_id, base_url, api_key or "")
     if model_id == "qwen-local":
-        return _local_qwen_generator()
-    elif model_id in ("mistral-local",):
-        return _local_mistral_generator()
-    elif model_id in ("llama3-local",):
-        return _local_llama3_generator()
-    elif model_id in ("deepseek-local",):
-        return _local_deepseek_generator()
-
-    # Ollama-managed models (fallback or explicit)
-    ollama_models = ["mixtral", "qwen2.5", "llama3.1", "llava", "gemma3", "llama3", "mistral", "phi3"]
-    is_ollama = any(m in model_id.lower() for m in ollama_models) or ":" in model_id
-    
-    if model_id in ("ollama", "ollama-auto") or is_ollama:
-        return _ollama_generator(api_key, preferred_model=model_id if ":" in model_id else None)
-    elif model_id == "nemotron-online":
-        return _nvidia_nemotron_generator()
-    elif model_id == "mistral-online":
-        return _nvidia_mistral_generator()
-    elif model_id == "gpt4o":
-        return _openai_generator(api_key)
-    elif model_id == "claude35":
+        return _local_gguf_generator("Qwen2.5-1.5B-Instruct-Q4_K_M.gguf")
+    if model_id == "mistral-local":
+        return _local_gguf_generator("mistral")
+    if model_id == "llama3-local":
+        return _local_gguf_generator("llama3")
+    if model_id == "deepseek-local":
+        return _local_gguf_generator("deepseek")
+    if model_id in ("ollama", "ollama-auto"):
+        return _ollama_generator()
+    if ":" in model_id or any(x in model_id.lower() for x in ("llama3.1", "qwen2.5", "llava", "gemma3", "phi3")):
+        return _ollama_generator(model_id)
+    if model_id == "gpt4o":
+        token = api_key or os.getenv("OPENAI_API_KEY")
+        return _openai_compatible("gpt-4o", "https://api.openai.com/v1", token or "")
+    if model_id == "claude35":
         return _anthropic_generator(api_key)
-    elif model_id == "gemini":
+    if model_id == "gemini":
         return _gemini_generator(api_key)
-    else:
-        logger.warning(f"Unknown LLM model '{model_id}', falling back to Ollama auto")
-        return _ollama_generator(api_key)
+    if model_id == "mistral-online":
+        token = api_key or os.getenv("MISTRAL_API_KEY")
+        return _openai_compatible("mistral-small-latest", "https://api.mistral.ai/v1", token or "")
+    if model_id == "nemotron-online":
+        token = api_key or os.getenv("NVIDIA_API_KEY")
+        return _openai_compatible("nvidia/llama-3.1-nemotron-ultra-253b-v1", "https://integrate.api.nvidia.com/v1", token or "", max_tokens=2048)
+    raise ValueError(f"Unsupported LLM model '{model_id}'")
 
 
 def get_model_display_name(model_id: str) -> str:
-    """Human-readable model name for visualization."""
-    caps = MODEL_CAPABILITIES.get(model_id)
-    if caps:
-        return caps["display_name"]
-    return model_id
+    return MODEL_CAPABILITIES.get(model_id, {}).get("display_name", model_id)
 
 
 def list_available_models() -> List[dict]:
-    """Return list of all available models with their capabilities."""
-    return [
-        {"id": k, **v}
-        for k, v in MODEL_CAPABILITIES.items()
-    ]
+    return [{"id": key, **value} for key, value in MODEL_CAPABILITIES.items()]
 
-
-# ═══════════════════════════════════════════════════════════
-#  Local Model Generators (via llama_cpp)
-# ═══════════════════════════════════════════════════════════
-
-def _local_qwen_generator():
-    from haystack.components.generators import OpenAIGenerator
-    # Use the 1.5B or 9B model depending on what's started, but OpenAI API doesn't care about the name string here
-    return OpenAIGenerator(
-        api_key=Secret.from_token("sk-no-key-required"),
-        api_base_url=f"http://localhost:{LLM_PORT}/v1",
-        model="Qwen2.5-1.5B-Instruct-Q4_K_M.gguf",
-        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
-        timeout=300.0,
-    )
-
-
-def _local_mistral_generator():
-    from haystack.components.generators import OpenAIGenerator
-    return OpenAIGenerator(
-        api_key=Secret.from_token("sk-no-key-required"),
-        api_base_url=f"http://localhost:{LLM_PORT}/v1",
-        model="mistral",
-        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
-        timeout=300.0,
-    )
-
-
-def _local_llama3_generator():
-    """Llama 3 via llama_cpp — same OpenAI-compatible interface."""
-    from haystack.components.generators import OpenAIGenerator
-    return OpenAIGenerator(
-        api_key=Secret.from_token("sk-no-key-required"),
-        api_base_url=f"http://localhost:{LLM_PORT}/v1",
-        model="llama3",
-        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
-        timeout=300.0,
-    )
-
-
-def _local_deepseek_generator():
-    """DeepSeek R1 via llama_cpp — same OpenAI-compatible interface."""
-    from haystack.components.generators import OpenAIGenerator
-    return OpenAIGenerator(
-        api_key=Secret.from_token("sk-no-key-required"),
-        api_base_url=f"http://localhost:{LLM_PORT}/v1",
-        model="deepseek",
-        generation_kwargs={"max_tokens": 512, "temperature": 0.3},
-        timeout=300.0,
-    )
-
-
-def _nvidia_nemotron_generator():
-    from haystack.components.generators import OpenAIGenerator
-    # Hardcoded test mode fallback
-    key = Secret.from_token("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")
-    return OpenAIGenerator(
-        api_key=key,
-        api_base_url="https://integrate.api.nvidia.com/v1",
-        model="nvidia/nemotron-3-super-120b-a12b",
-        generation_kwargs={
-            "max_tokens": 4096, 
-            "temperature": 0.5,
-            "extra_body": {"chat_template_kwargs": {"enable_thinking": True}, "reasoning_budget": 4096}
-        },
-        timeout=120.0,
-    )
-
-
-def _nvidia_mistral_generator():
-    from haystack.components.generators import OpenAIGenerator
-    # Hardcoded test mode fallback
-    key = Secret.from_token("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")
-    return OpenAIGenerator(
-        api_key=key,
-        api_base_url="https://integrate.api.nvidia.com/v1",
-        model="mistralai/mistral-small-4-119b-2603",
-        generation_kwargs={"max_tokens": 4096, "temperature": 0.5},
-        timeout=120.0,
-    )
-
-
-# ═══════════════════════════════════════════════════════════
-#  Ollama Integration
-# ═══════════════════════════════════════════════════════════
-
-OLLAMA_PORT = 11434  # Default Ollama port
-
-
-def _check_ollama_running() -> tuple:
-    """Check if Ollama server is running and accessible."""
-    try:
-        import requests
-        resp = requests.get(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=3)
-        if resp.status_code == 200:
-            models = resp.json().get("models", [])
-            model_names = [m["name"] for m in models]
-            return True, f"Ollama running with models: {', '.join(model_names)}"
-        return False, "Ollama server returned non-200 status"
-    except Exception:
-        return False, "Ollama is not running. Start with: ollama serve"
-
-
-def _ollama_generator(api_key: Optional[str] = None, preferred_model: Optional[str] = None):
-    """
-    Ollama integration via OpenAI-compatible API.
-    Auto-selects the best available model from the running Ollama instance.
-    Prefers large models (mixtral, qwen2.5, llama3.1) when available.
-    """
-    from haystack.components.generators import OpenAIGenerator
-
-    # Priority order: largest/best models first
-    model_priority = ["mixtral", "qwen2.5", "llama3.1", "llama3", "gemma3", "gemma2", "mistral", "phi3", "llama2", "deepseek"]
-
-    model_name = preferred_model or "llama3.1:8b"  # default fallback
-    try:
-        import requests
-        resp = requests.get(f"http://localhost:{OLLAMA_PORT}/api/tags", timeout=3)
-        if resp.status_code == 200:
-            models = resp.json().get("models", [])
-            if models:
-                model_names = [m["name"] for m in models]
-
-                # If specific model requested, use it if available
-                if preferred_model and ":" in preferred_model:
-                    if any(preferred_model in n for n in model_names):
-                        model_name = preferred_model
-                    else:
-                        # Fall through to priority selection
-                        preferred_model = None
-
-                if not preferred_model or ":" not in str(preferred_model):
-                    # Auto-select best model by priority
-                    for preferred in (model_priority if not preferred_model else [preferred_model] + model_priority):
-                        matching = [n for n in model_names if preferred in n.lower()]
-                        if matching:
-                            model_name = matching[0]
-                            break
-                    else:
-                        model_name = model_names[0]
-
-            logger.info(f"Ollama: Using model '{model_name}'")
-    except Exception:
-        logger.warning(f"Could not query Ollama, using default '{model_name}'")
-
-    return OpenAIGenerator(
-        api_key=Secret.from_token("ollama"),
-        api_base_url=f"http://localhost:{OLLAMA_PORT}/v1",
-        model=model_name,
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
-        timeout=300.0,
-    )
-
-
-# ═══════════════════════════════════════════════════════════
-#  Cloud Model Generators
-# ═══════════════════════════════════════════════════════════
-
-def _openai_generator(api_key: Optional[str] = None):
-    from haystack.components.generators import OpenAIGenerator
-    key = Secret.from_token(api_key) if api_key else Secret.from_env_var("OPENAI_API_KEY")
-    return OpenAIGenerator(
-        api_key=key,
-        model="gpt-4o",
-        generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
-    )
-
-
-def _anthropic_generator(api_key: Optional[str] = None):
-    try:
-        from haystack_integrations.components.generators.anthropic import AnthropicGenerator
-        key = Secret.from_token(api_key) if api_key else Secret.from_env_var("ANTHROPIC_API_KEY")
-        return AnthropicGenerator(
-            api_key=key,
-            model="claude-3-5-sonnet-20241022",
-            generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
-        )
-    except ImportError:
-        logger.warning("anthropic-haystack not installed — using OpenAI-compatible fallback")
-        from haystack.components.generators import OpenAIGenerator
-        key = Secret.from_token(api_key) if api_key else Secret.from_env_var("ANTHROPIC_API_KEY")
-        return OpenAIGenerator(
-            api_key=key,
-            api_base_url="https://api.anthropic.com/v1",
-            model="claude-3-5-sonnet-20241022",
-            generation_kwargs={"max_tokens": 1024, "temperature": 0.7},
-        )
-
-
-def _gemini_generator(api_key: Optional[str] = None):
-    try:
-        from haystack_integrations.components.generators.google_ai import GoogleAIGeminiGenerator
-        key = Secret.from_token(api_key) if api_key else Secret.from_env_var("GOOGLE_API_KEY")
-        return GoogleAIGeminiGenerator(
-            api_key=key,
-            model="gemini-pro",
-            generation_kwargs={"max_output_tokens": 1024, "temperature": 0.7},
-        )
-    except ImportError:
-        logger.warning("google-ai-haystack not installed — falling back to local Qwen")
-        return _local_qwen_generator()
-
-
-# ═══════════════════════════════════════════════════════════
-#  API Key Validation
-# ═══════════════════════════════════════════════════════════
 
 def validate_api_key(provider: str, api_key: str) -> dict:
-    """
-    Validate an API key by making a lightweight request.
-    Returns {"valid": bool, "message": str}
-    """
-    import requests
-
+    if not api_key and provider != "ollama":
+        return {"valid": False, "message": "API key is required"}
     try:
         if provider == "openai":
-            resp = requests.get(
-                "https://api.openai.com/v1/models",
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                return {"valid": True, "message": "OpenAI key is valid"}
-            return {"valid": False, "message": f"OpenAI returned {resp.status_code}"}
-
+            response = requests.get("https://api.openai.com/v1/models", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
         elif provider == "anthropic":
-            resp = requests.get(
-                "https://api.anthropic.com/v1/models",
-                headers={
-                    "x-api-key": api_key,
-                    "anthropic-version": "2023-06-01",
-                },
-                timeout=10,
-            )
-            if resp.status_code in (200, 403):
-                return {"valid": True, "message": "Anthropic key recognized"}
-            return {"valid": False, "message": f"Anthropic returned {resp.status_code}"}
-
+            response = requests.get("https://api.anthropic.com/v1/models", headers={"x-api-key": api_key, "anthropic-version": "2023-06-01"}, timeout=10)
         elif provider == "mistral":
-            resp = requests.get(
-                "https://api.mistral.ai/v1/models",
-                headers={"Authorization": f"Bearer {api_key}"},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                return {"valid": True, "message": "Mistral key is valid"}
-            return {"valid": False, "message": f"Mistral returned {resp.status_code}"}
-
+            response = requests.get("https://api.mistral.ai/v1/models", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
         elif provider == "gemini":
-            resp = requests.get(
-                f"https://generativelanguage.googleapis.com/v1/models?key={api_key}",
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                return {"valid": True, "message": "Google API key is valid"}
-            return {"valid": False, "message": f"Google returned {resp.status_code}"}
-
+            response = requests.get("https://generativelanguage.googleapis.com/v1beta/models", params={"key": api_key}, timeout=10)
+        elif provider == "nvidia":
+            response = requests.get("https://integrate.api.nvidia.com/v1/models", headers={"Authorization": f"Bearer {api_key}"}, timeout=10)
         elif provider == "ollama":
-            running, msg = _check_ollama_running()
-            return {"valid": running, "message": msg}
-
+            running, message = _check_ollama_running()
+            return {"valid": running, "message": message}
         else:
             return {"valid": False, "message": f"Unknown provider: {provider}"}
-
-    except Exception as e:
-        return {"valid": False, "message": f"Connection error: {str(e)}"}
+        if response.status_code == 200:
+            return {"valid": True, "message": f"{provider} credential is valid"}
+        return {"valid": False, "message": f"{provider} returned HTTP {response.status_code}"}
+    except Exception as exc:
+        return {"valid": False, "message": f"Connection error: {exc}"}
