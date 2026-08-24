@@ -8,7 +8,7 @@ A customer describes the outcome in plain language, adds websites/files/server f
 
 ## Current verified release status
 
-The lightweight production release is protected by the GitHub Actions **RAG Validation Matrix**. The latest release candidate passed every hosted source/build gate, including:
+The lightweight production release is protected by the GitHub Actions **RAG Validation Matrix**. A release candidate must pass every hosted source/build gate, including:
 
 - backend production module compilation;
 - all 11 RAG catalog contracts;
