@@ -12,7 +12,7 @@ from typing import Dict
 
 from .haystack_service import build_and_deploy_pipeline
 from .rag_catalog import normalize_rag_type, recommended_profile, validate_deploy_config
-from .rag_autopilot import register_autopilot, start_runtime_supervisor
+from .rag_autopilot_runtime import register_autopilot, start_runtime_supervisor
 
 logger = logging.getLogger(__name__)
 BACKEND_DIR = Path(__file__).resolve().parent.parent
