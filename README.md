@@ -6,6 +6,25 @@ A customer describes the outcome in plain language, adds websites/files/server f
 
 > The project separates **source/build certification** from **live runtime certification**. CI does not fake model, embedding or vector-store services.
 
+## Current verified release status
+
+The lightweight production pass is certified by GitHub Actions **RAG Validation Matrix run #52**:
+
+- backend production modules compile successfully;
+- all 11 RAG catalog contracts pass;
+- all self-developing/Autopilot contracts pass;
+- secret and vector-store safety contracts pass;
+- production npm audit reports **0 vulnerabilities**;
+- customer and analytics lint passes with **0 warnings**;
+- Plotly is absent from runtime dependencies;
+- the complete Vite frontend builds successfully;
+- the former ~4.65 MB Plotly bundle is removed;
+- the native React/SVG analytics chunk is about **12.81 kB**;
+- the largest generated JavaScript chunk is about **242 KiB**, below the enforced **700 KiB** limit;
+- the final `PR source + build certified` gate passes.
+
+The real 11/11 model/vector runtime matrix remains a separate deployment certificate because it must execute against the target environment's actual model, embeddings and vector-store services.
+
 ## What the product does
 
 ```text
@@ -67,7 +86,7 @@ Autopilot turns a one-time RAG into a maintained knowledge system.
 
 The customer frontend is React + Vite and is intentionally kept lightweight.
 
-The previous analytics route loaded Plotly as a ~4.65 MB JavaScript chunk. It has been replaced with **native React/SVG architecture visualizations**, and Plotly is no longer a runtime dependency. CI now enforces:
+The previous analytics route loaded Plotly as a ~4.65 MB JavaScript chunk. It has been replaced with **native React/SVG architecture visualizations**, and Plotly is no longer a runtime dependency. CI enforces:
 
 - zero-warning lint for the customer and analytics routes;
 - no Plotly runtime dependency;
