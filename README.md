@@ -1,209 +1,239 @@
-# 🚀 AgenticRAG (OmniRAG-inspired)
+# AgenticRAG
 
-**AgenticRAG** is a next-generation AI system inspired by **OmniRAG architecture**, combining **agent-based reasoning + multi-source retrieval + intelligent context routing** to deliver highly accurate and enterprise-ready AI responses.
+**AgenticRAG is a chat-first RAG factory that builds, validates and continuously updates production retrieval systems from customer data.**
 
-It moves beyond traditional RAG by dynamically selecting the **best data source based on user intent**, ensuring better accuracy, lower cost, and real-time intelligence.
+A customer describes the outcome in plain language, adds websites/files/server folders, and the backend selects or validates one of **11 real RAG architectures**. The same workflow then deploys the pipeline, runs a grounded validation query and can keep monitored knowledge fresh through **RAG Autopilot**.
 
----
+> The project separates **source/build certification** from **live runtime certification**. CI does not fake model, embedding or vector-store services.
 
-## 🧠 What is AgenticRAG?
+## Current verified release status
 
-AgenticRAG is an **AI-powered knowledge engine** that:
+The lightweight production release is protected by the GitHub Actions **RAG Validation Matrix**. A release candidate must pass every hosted source/build gate, including:
 
-* Understands user intent
-* Dynamically selects retrieval strategies
-* Combines multiple data sources (vector DB, APIs, knowledge graph)
-* Generates precise, context-aware responses
+- backend production module compilation;
+- all 11 RAG catalog contracts;
+- all self-developing/Autopilot contracts;
+- secret and vector-store safety contracts;
+- production npm audit with **0 vulnerabilities**;
+- customer and analytics lint with **0 warnings**;
+- no Plotly runtime dependency;
+- complete Vite frontend production build;
+- removal of the former ~4.65 MB Plotly bundle;
+- native React/SVG analytics chunk of about **12.81 kB**;
+- largest generated JavaScript chunk of about **242 KiB**, below the enforced **700 KiB** limit;
+- final `PR source + build certified` gate.
 
-Unlike traditional RAG systems, it avoids **static retrieval pipelines** and instead uses **agentic orchestration** for smarter decisions.
+The real 11/11 model/vector runtime matrix remains a separate deployment certificate because it must execute against the target environment's actual model, embeddings and vector-store services.
 
-📌 Inspired by OmniRAG: a system that intelligently routes queries to the most relevant data source for maximum accuracy ([Microsoft Learn][1])
+## What the product does
 
----
-
-## ⚙️ Core Architecture
-
-AgenticRAG follows an **OmniRAG-style architecture**:
-
+```text
+Customer request
+      ↓
+Chat-first RAG Studio
+      ↓
+AI/backend architecture selection
+      ↓
+Website · files · customer folders
+      ↓
+Ingestion + embeddings + vector/graph storage
+      ↓
+Real RAG pipeline build
+      ↓
+Grounded validation query
+      ↓
+RAG Autopilot monitors knowledge changes
+      ↓
+Blue/green rebuild → verify → safe swap
 ```
-User Query
-   ↓
-🧠 Intent Detection Agent
-   ↓
-🔀 Intelligent Routing Layer
-   ↓
- ├── 📚 Vector Search (FAISS / Pinecone)
- ├── 🗄️ Database Query (SQL / APIs)
- ├── 🧠 Knowledge Graph (Graph DB)
- └── 📄 Document Retrieval
-   ↓
-🤖 LLM Generator
-   ↓
-💾 Memory + Context Layer
-   ↓
-Final Response
-```
 
-💡 The system dynamically chooses:
+The default customer route is `/`. The original detailed builder remains available at `/advanced`, and the guided starter experience is available at `/starter`.
 
-* **Vector search** for similarity queries
-* **Database queries** for structured data
-* **Knowledge graph traversal** for relationships ([Microsoft Learn][1])
+## 11 supported RAG architectures
 
----
+| Architecture | Production behavior |
+| --- | --- |
+| `basic` | Dense-first retrieval with lexical fallback |
+| `hybrid` | BM25 + dense retrieval with reciprocal-rank fusion |
+| `citation` | Retrieved source IDs + citation-constrained generation |
+| `realtime` | Freshness-aware retrieval + monitored re-ingestion |
+| `personalized` | Profile-aware query expansion without overriding source truth |
+| `multimodal` | Text + OCR/vision + audio transcript evidence |
+| `conversational` | Grounded conversation memory for follow-up questions |
+| `agentic` | Retrieval-first planning, safe tools, confirmation and verification |
+| `structured` | Entity extraction + graph traversal + retrieval |
+| `crosslingual` | Detect → translate → retrieve → answer → translate back |
+| `voice` | Speech-to-text → RAG → text-to-speech |
 
-## ✨ Key Features
+Unsupported marketing-only labels are rejected instead of silently building a different pipeline.
 
-* 🤖 **Agentic Decision Making**
-* 🔀 **Dynamic Source Routing (OmniRAG style)**
-* 🧠 **User Intent Detection**
-* 📚 **Multi-source Retrieval (not just vector DB)**
-* 🌐 **Knowledge Graph Integration**
-* ⚡ **Reduced hallucination & improved accuracy**
-* 💬 **Conversational memory support**
-* 🧩 **Modular + scalable design**
+## RAG Autopilot
 
----
+Autopilot turns a one-time RAG into a maintained knowledge system.
 
-## 🚀 Why This is Powerful
+- monitors static/dynamic websites and customer-server folders;
+- can render full pages and use the existing OCR/vision parser for visual changes;
+- fingerprints source content with SHA-256 so unchanged data is not reindexed;
+- detects additions, edits and removals;
+- rebuilds into a versioned blue/green pipeline;
+- swaps the stable customer pipeline only after the new generation succeeds;
+- keeps the last-known-good RAG live when a refresh fails;
+- rehydrates persisted monitored deployments after backend restart;
+- exposes generation, source count, last update and error state in the customer UI;
+- can safely evolve eligible Basic deployments toward Realtime/Multimodal behavior as monitored data changes.
 
-Traditional RAG Problems ❌:
+## Lightweight frontend
 
-* Static retrieval (only vector DB)
-* Poor handling of complex queries
-* Loss of context across sources
+The customer frontend is React + Vite and is intentionally kept lightweight.
 
-AgenticRAG Solution ✅:
+The previous analytics route loaded Plotly as a ~4.65 MB JavaScript chunk. It has been replaced with **native React/SVG architecture visualizations**, and Plotly is no longer a runtime dependency. CI enforces:
 
-* Selects best retrieval method per query
-* Combines multiple sources for better context
-* Understands relationships using graphs
-* Produces enterprise-grade answers
+- zero-warning lint for the customer and analytics routes;
+- no Plotly runtime dependency;
+- no high-severity production npm audit findings;
+- a maximum JavaScript chunk size of **700 KiB**;
+- a complete production Vite build.
 
-📊 Result:
+The architecture comparison UI also avoids presenting synthetic design scores as measured benchmark accuracy/latency. Real runtime quality belongs to the runtime certification matrix.
 
-* Higher accuracy
-* Lower cost
-* Better reasoning
+## Model and vector-store runtime
 
----
+AgenticRAG supports customer-controlled local and cloud model paths.
 
-## 🛠️ Tech Stack
+### Local model options
 
-* **LangChain / CrewAI** – Agent orchestration
-* **LLMs** – OpenAI / Local LLaMA (GGUF)
-* **Vector DB** – FAISS / Chroma / Pinecone
-* **Graph DB** – Neo4j / RDF (Knowledge Graph)
-* **Backend** – FastAPI / Node.js
-* **Frontend** – React / Streamlit
+- **Ollama**: default endpoint `http://localhost:11434/v1`
+- **OpenAI-compatible local GGUF service**: default endpoint `http://127.0.0.1:8080/v1`
+- Override the GGUF endpoint with `LOCAL_LLM_BASE_URL`.
+- Override Ollama's port with `OLLAMA_PORT`.
 
----
+The FastAPI backend runs on port **8010**, deliberately separate from the local LLM endpoint.
 
-## 📦 Installation
+### Vector stores
+
+The backend includes local/cloud integrations such as Chroma, FAISS and Qdrant. A requested store must initialize successfully; it is not silently replaced with an empty in-memory database.
+
+## Security and truthfulness
+
+- provider credentials come from the current request or environment;
+- cloud provider secrets are not embedded in source;
+- deployment metadata/customer exports intentionally drop API keys;
+- agentic side-effect tools require explicit confirmation;
+- unavailable tools fail truthfully instead of returning fake success;
+- failed Autopilot rebuilds preserve the last-known-good deployment;
+- runtime certification requires real services instead of mocks.
+
+## Certification
+
+### 1. Pull-request source/build certificate
+
+`.github/workflows/rag-validation.yml` validates:
+
+1. production Python module compilation;
+2. exact 11-type RAG catalog contracts;
+3. self-developing RAG/Autopilot contracts;
+4. provider-secret and vector-store safety contracts;
+5. production npm security audit;
+6. zero-warning customer/analytics lint;
+7. lightweight bundle budget;
+8. complete Vite production build.
+
+The final CI gate is named **`PR source + build certified`**.
+
+### 2. Real 11/11 deployment certificate
+
+`backend/test_all_rags.py` builds and queries every supported RAG against a running backend and real runtime services.
+
+It validates a known fixture fact (the AX-10 two-year warranty) instead of treating any non-empty model response as success. Citation RAG also receives an additional source/citation check.
+
+Runtime settings are configurable:
 
 ```bash
-git clone https://github.com/your-username/AgenticRag.git
-cd AgenticRag
+RAG_TEST_BASE_URL=http://localhost:8010
+RAG_TEST_LLM_MODEL=ollama-auto
+RAG_TEST_EMBEDDING_MODEL=bge-local
+RAG_TEST_LOCAL_DB=chroma
+python backend/test_all_rags.py
+```
+
+A successful run writes:
+
+```text
+backend/test_all_rags_output.json
+```
+
+GitHub Actions also exposes a manual **Live 11/11 runtime certification** job for a prepared self-hosted runner. This is intentionally separate from ordinary hosted PR CI.
+
+## Quick start
+
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/macOS: source .venv/bin/activate
 pip install -r requirements.txt
+python main.py
 ```
 
----
+Backend health:
 
-## ▶️ Usage
+```text
+http://localhost:8010/health
+```
+
+### Frontend
 
 ```bash
-python app.py
+cd chatbotui
+npm ci
+npm run dev
 ```
 
----
+For production verification:
 
-## 🧪 Use Cases
-
-* 🏢 Enterprise Knowledge Assistant
-* 📄 Document AI (PDF / Reports)
-* 🏦 Financial Intelligence Systems
-* 🏥 Healthcare AI Assistant
-* 📞 Customer Support Automation
-* 🧑‍💻 Developer Copilot
-
----
-
-## 🧩 Advanced Concepts (OmniRAG Inspired)
-
-### 🔍 Intent-Based Routing
-
-System detects what the user wants and chooses the best retrieval method.
-
-### 🌐 Multi-Source Retrieval
-
-Combines:
-
-* Structured data
-* Unstructured documents
-* Knowledge graphs
-
-### 🧠 Knowledge Graph Reasoning
-
-Understands relationships between entities for deeper insights.
-
-### 🔄 Adaptive Retrieval
-
-Uses multiple sources together when needed for better context.
-
----
-
-## 📁 Project Structure
-
+```bash
+npm run audit:prod
+npm run build
 ```
+
+## Repository structure
+
+```text
 AgenticRag/
-│── app.py
-│── agents/
-│── routing/
-│── retriever/
-│── knowledge_graph/
-│── memory/
-│── utils/
-│── data/
-│── requirements.txt
-│── README.md
+├── .github/workflows/rag-validation.yml
+├── backend/
+│   ├── main.py
+│   ├── requirements.txt
+│   ├── test_all_rags.py
+│   ├── test_rag_catalog.py
+│   ├── test_self_developing_rag.py
+│   ├── test_security_contract.py
+│   └── services/
+│       ├── rag_builder.py
+│       ├── rag_autopilot.py
+│       ├── rag_autopilot_runtime.py
+│       ├── vector_store_manager.py
+│       ├── llm_service.py
+│       └── pipeline_modules/
+└── chatbotui/
+    ├── src/ChatRagStudio.jsx
+    ├── src/CustomerRagStudio.jsx
+    ├── src/App.jsx
+    └── src/components/RagAnalyticsDashboard.jsx
 ```
 
----
+## Production release rule
 
-## 🔮 Future Enhancements
+A branch can be described as **source/build certified** only when the GitHub CI certificate passes. A deployment can be described as **runtime certified** only when the real `test_all_rags.py` matrix passes in that target model/embedding/vector environment.
 
-* ✅ Multi-modal RAG (image, audio, video)
-* ✅ Multi-agent collaboration
-* ✅ Reinforcement Learning (RL Agents)
-* ✅ Auto optimization of retrieval strategy
-* ✅ Real-time streaming + analytics
+No universal accuracy or profitability-style claim is inferred from architecture labels or UI profile values.
 
----
+## License
 
-## 🤝 Contributing
+MIT License. See `LICENSE` for details.
 
-Contributions are welcome!
+## Contributing
 
-1. Fork the repo
-2. Create a new branch
-3. Commit changes
-4. Submit a PR
-
----
-
-## 📜 License
-
-This project is licensed under the **MIT License**.
-
----
-
-## 📬 Contact
-
-* GitHub Issues
-* Email: (logeshv586@gmail.com)
-
----
-
-⭐ If you like this project, give it a star!
-
-[1]: https://learn.microsoft.com/en-us/azure/cosmos-db/gen-ai/cosmos-ai-graph?utm_source=chatgpt.com "AI Knowledge Graphs - Azure Cosmos DB"
+Issues and pull requests are welcome. For changes to production RAG behavior, include or update the relevant contract test and keep the certification distinction above intact.

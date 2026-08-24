@@ -1,10 +1,12 @@
 """Live runtime validation matrix for every supported RAG architecture.
 
-Run while the backend is running on port 8010. This test intentionally avoids
-external websites: each pipeline is built from the same local fixture text and
-then queried through the real /api/test-chat endpoint.
+This is the deployment certificate, not a mock/unit test. Run it against a real
+backend plus real model, embedding and vector-store services. The default model is
+Ollama Auto because it avoids sharing the backend's port and is easy to prepare on
+a self-hosted runner. Override the runtime through RAG_TEST_* environment variables.
 """
 import json
+import os
 import time
 from pathlib import Path
 
@@ -12,7 +14,11 @@ import requests
 
 from services.rag_catalog import SUPPORTED_RAG_TYPES, recommended_profile
 
-BASE_URL = "http://localhost:8010"
+BASE_URL = os.getenv("RAG_TEST_BASE_URL", "http://localhost:8010").rstrip("/")
+LLM_MODEL = os.getenv("RAG_TEST_LLM_MODEL", "ollama-auto")
+EMBEDDING_MODEL = os.getenv("RAG_TEST_EMBEDDING_MODEL", "bge-local")
+LOCAL_DB = os.getenv("RAG_TEST_LOCAL_DB", "chroma")
+TIMEOUT = int(os.getenv("RAG_TEST_TIMEOUT_SECONDS", "180"))
 OUTPUT = Path(__file__).with_name("test_all_rags_output.json")
 FIXTURE_TEXTS = [
     "Acme Support Policy: Standard support is available Monday to Friday. Critical incidents are handled 24/7.",
@@ -29,10 +35,10 @@ def deploy_payload(rag_type: str) -> dict:
         "ragType": rag_type,
         "dbType": "local",
         "cloudDb": "",
-        "localDb": "chroma",
+        "localDb": LOCAL_DB,
         "dynamicConfig": profile["dynamicConfig"],
-        "llmModel": "qwen-local",
-        "embeddingModel": "bge-local",
+        "llmModel": LLM_MODEL,
+        "embeddingModel": EMBEDDING_MODEL,
         "chunkSize": profile["chunkSize"],
         "topK": profile["topK"],
         "useReranker": profile["useReranker"],
@@ -51,11 +57,16 @@ def deploy_payload(rag_type: str) -> dict:
     }
 
 
+def _answer_has_expected_fact(answer: str) -> bool:
+    normalized = " ".join(answer.lower().replace("-", " ").split())
+    return "two year warranty" in normalized or "2 year warranty" in normalized
+
+
 def validate_one(rag_type: str) -> dict:
     started = time.time()
     result = {"rag_type": rag_type, "deploy": "failed", "query": "not-run", "passed": False}
     try:
-        deploy = requests.post(f"{BASE_URL}/api/deploy", json=deploy_payload(rag_type), timeout=180)
+        deploy = requests.post(f"{BASE_URL}/api/deploy", json=deploy_payload(rag_type), timeout=TIMEOUT)
         deploy.raise_for_status()
         deploy_data = deploy.json()
         pipeline_id = deploy_data.get("pipeline_id") or deploy_data.get("deployment_info", {}).get("pipeline_id")
@@ -75,14 +86,24 @@ def validate_one(rag_type: str) -> dict:
                 "query": "What warranty does model AX-10 have? Answer only from the supplied knowledge and cite the evidence when supported.",
                 **({"audio_base64": ""} if rag_type == "voice" else {}),
             },
-            timeout=180,
+            timeout=TIMEOUT,
         )
         query.raise_for_status()
         query_data = query.json()
         answer = str(query_data.get("answer") or "").strip()
-        query_passed = bool(answer) and not answer.startswith("⚠️") and "please create a rag" not in answer.lower()
+        grounded_fact = _answer_has_expected_fact(answer)
+        citation_ok = rag_type != "citation" or "[S" in answer or "source" in answer.lower()
+        query_passed = (
+            bool(answer)
+            and not answer.startswith("⚠️")
+            and "please create a rag" not in answer.lower()
+            and grounded_fact
+            and citation_ok
+        )
         result.update({
             "query": "passed" if query_passed else "failed",
+            "grounded_fact": grounded_fact,
+            "citation_check": citation_ok,
             "answer_preview": answer[:500],
             "passed": query_passed,
         })
@@ -100,6 +121,12 @@ def main() -> int:
         print(f"Backend is not ready at {BASE_URL}: {exc}")
         return 2
 
+    print("Runtime configuration:")
+    print(f"  backend={BASE_URL}")
+    print(f"  llm={LLM_MODEL}")
+    print(f"  embedding={EMBEDDING_MODEL}")
+    print(f"  vector_store={LOCAL_DB}")
+
     results = []
     print(f"Validating {len(SUPPORTED_RAG_TYPES)} RAG architectures against the live backend…")
     for rag_type in SUPPORTED_RAG_TYPES:
@@ -109,6 +136,12 @@ def main() -> int:
         print("PASS" if result["passed"] else f"FAIL: {result.get('error') or result.get('answer_preview', '')[:160]}")
 
     summary = {
+        "runtime": {
+            "backend": BASE_URL,
+            "llm_model": LLM_MODEL,
+            "embedding_model": EMBEDDING_MODEL,
+            "local_db": LOCAL_DB,
+        },
         "total": len(results),
         "passed": sum(1 for item in results if item["passed"]),
         "failed": sum(1 for item in results if not item["passed"]),

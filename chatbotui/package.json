@@ -7,16 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "audit:prod": "npm audit --omit=dev --audit-level=high",
     "preview": "vite preview"
   },
   "dependencies": {
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
-    "plotly.js": "^3.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-plotly.js": "^2.6.0",
-    "react-router-dom": "^7.13.1",
+    "react-router-dom": "7.18.2",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

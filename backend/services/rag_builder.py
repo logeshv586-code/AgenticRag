@@ -1,39 +1,37 @@
-"""
-RAG Builder — Orchestrates deployment and metadata management.
-Supports API, offline, and hybrid deployment modes.
-"""
-import os
-import uuid
+"""RAG Builder — validated deployment, safe persistence and self-developing Autopilot."""
+from __future__ import annotations
+
 import json
 import logging
+import re
+import shutil
+from copy import deepcopy
+from pathlib import Path
 from typing import Dict
 
 from .haystack_service import build_and_deploy_pipeline
 from .rag_catalog import normalize_rag_type, recommended_profile, validate_deploy_config
+from .rag_autopilot_runtime import register_autopilot, start_runtime_supervisor
 
 logger = logging.getLogger(__name__)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+DATA_DIR = BACKEND_DIR / "data"
+DEPLOY_DIR = DATA_DIR / "deployments"
+DEPLOY_DIR.mkdir(parents=True, exist_ok=True)
 
-# Deployment artifacts directory
-DEPLOY_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "deployments")
-os.makedirs(DEPLOY_DIR, exist_ok=True)
+
+def _safe_rag_name(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", (value or "RAG").strip())[:100]
+    return cleaned or "RAG"
 
 
 def _prepare_customer_config(config: dict) -> tuple[dict, dict]:
-    """Resolve model/customer selection and enforce the supported backend contract."""
-    prepared = dict(config)
+    prepared = deepcopy(config)
     raw_type = prepared.get("ragType", "basic")
     resolved_type, selection = normalize_rag_type(raw_type)
-
-    # When the UI sends auto::<plain customer request>, the backend owns the final
-    # classification and applies architecture-appropriate safe defaults. This is
-    # intentionally a fallback as the chat UI normally asks the local guide model
-    # for a type first.
     if str(raw_type).lower().startswith("auto::"):
         profile = recommended_profile(resolved_type)
-        prepared["dynamicConfig"] = {
-            **profile.get("dynamicConfig", {}),
-            **(prepared.get("dynamicConfig") or {}),
-        }
+        prepared["dynamicConfig"] = {**profile.get("dynamicConfig", {}), **(prepared.get("dynamicConfig") or {})}
         if not prepared.get("features"):
             prepared["features"] = profile["features"]
         prepared["chunkSize"] = prepared.get("chunkSize") or profile["chunkSize"]
@@ -43,8 +41,8 @@ def _prepare_customer_config(config: dict) -> tuple[dict, dict]:
         prepared["hallucinationGuard"] = prepared.get("hallucinationGuard", profile["hallucinationGuard"])
         prepared["explainability"] = prepared.get("explainability", profile["explainability"])
         prepared["streamingResponse"] = prepared.get("streamingResponse", profile["streamingResponse"])
-
     prepared["ragType"] = resolved_type
+    prepared["ragName"] = _safe_rag_name(prepared.get("ragName", "RAG"))
     validation = validate_deploy_config(prepared)
     validation["selection"] = selection
     if not validation["valid"]:
@@ -52,20 +50,24 @@ def _prepare_customer_config(config: dict) -> tuple[dict, dict]:
     return prepared, validation
 
 
-def deploy_rag_system(config: dict) -> Dict:
-    """
-    Deploy the RAG system based on user/model configuration.
+def _safe_persisted_config(config: dict) -> dict:
+    safe = deepcopy(config)
+    safe.pop("extracted_texts", None)
+    safe["apiKeys"] = {}
+    return safe
 
-    `ragType` may be an explicit supported architecture or `auto::<customer request>`.
-    Auto mode is resolved in the backend before any pipeline is created.
-    Supports 'api', 'offline', and 'hybrid' deployment types.
-    """
+
+def _write_deployment_metadata(pipeline_id: str, config: dict, response: dict):
+    path = DEPLOY_DIR / f"{pipeline_id}.json"
+    temp = path.with_suffix(".json.tmp")
+    temp.write_text(json.dumps({"pipeline_id": pipeline_id, "config": _safe_persisted_config(config), "deployment": response}, indent=2, default=str), encoding="utf-8")
+    temp.replace(path)
+
+
+def deploy_rag_system(config: dict) -> Dict:
     config, validation = _prepare_customer_config(config)
     deployment_type = config.get("deploymentType", "api")
-    pipeline_id, pipeline = build_and_deploy_pipeline(config)
-
-    endpoint = f"http://localhost:8010/api/test-chat"
-
+    pipeline_id, _ = build_and_deploy_pipeline(config)
     response = {
         "pipeline_id": pipeline_id,
         "type": config.get("ragType"),
@@ -74,54 +76,42 @@ def deploy_rag_system(config: dict) -> Dict:
         "total_characters": sum(len(t) for t in config.get("extracted_texts", [])),
         "deployment_type": deployment_type,
         "selection": validation.get("selection", {}),
-        "validation": {
-            "valid": validation["valid"],
-            "warnings": validation["warnings"],
-            "rag_type": validation["rag_type"],
-        },
+        "validation": {"valid": validation["valid"], "warnings": validation["warnings"], "rag_type": validation["rag_type"]},
     }
-
-    # ── API deployment ───────────────────────────────────
     if deployment_type in ("api", "hybrid"):
-        response["query_endpoint"] = endpoint
+        response["query_endpoint"] = "http://localhost:8010/api/test-chat"
         response["api_deployed"] = True
-        logger.info(f"API endpoint ready: {endpoint}")
-
-    # ── Offline deployment ───────────────────────────────
     if deployment_type in ("offline", "hybrid"):
-        offline_info = _create_offline_package(pipeline_id, config)
-        response["offline_package"] = offline_info
+        response["offline_package"] = _create_offline_package(pipeline_id, config)
         response["offline_deployed"] = True
-
-    # ── Save deployment metadata ─────────────────────────
-    meta_path = os.path.join(DEPLOY_DIR, f"{pipeline_id}.json")
-    try:
-        # Strip non-serializable items from config
-        safe_config = {k: v for k, v in config.items() if k != "extracted_texts"}
-        with open(meta_path, 'w') as f:
-            json.dump({
-                "pipeline_id": pipeline_id,
-                "config": safe_config,
-                "deployment": response,
-            }, f, indent=2, default=str)
-        logger.info(f"Deployment metadata saved: {meta_path}")
-    except Exception as e:
-        logger.warning(f"Could not save deployment metadata: {e}")
-
+    _write_deployment_metadata(pipeline_id, config, response)
+    autopilot = register_autopilot(pipeline_id, config)
+    response["autopilot"] = autopilot
+    _write_deployment_metadata(pipeline_id, config, response)
+    logger.info("RAG deployed: %s (%s), autopilot=%s", pipeline_id, config.get("ragType"), autopilot.get("enabled"))
     return response
 
 
-def _create_offline_package(pipeline_id: str, config: dict) -> dict:
-    """
-    Create an offline deployment package.
-    Generates a config file and dependency list for air-gapped deployment.
-    """
-    package_dir = os.path.join(DEPLOY_DIR, f"{pipeline_id}_offline")
-    os.makedirs(package_dir, exist_ok=True)
+def _copy_runtime(package_dir: Path, config: dict):
+    app_dir = package_dir / "app"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(BACKEND_DIR / "main.py", app_dir / "main.py")
+    if (BACKEND_DIR / "requirements.txt").exists():
+        shutil.copy2(BACKEND_DIR / "requirements.txt", app_dir / "requirements.txt")
+    shutil.copytree(BACKEND_DIR / "services", app_dir / "services", dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    rag_name = _safe_rag_name(config.get("ragName", "RAG"))
+    src_data = DATA_DIR / rag_name
+    if src_data.exists():
+        shutil.copytree(src_data, app_dir / "data" / rag_name, dirs_exist_ok=True, ignore=shutil.ignore_patterns("*.tmp"))
 
-    # Pipeline configuration YAML
+
+def _create_offline_package(pipeline_id: str, config: dict) -> dict:
+    package_dir = DEPLOY_DIR / f"{pipeline_id}_offline"
+    package_dir.mkdir(parents=True, exist_ok=True)
+    _copy_runtime(package_dir, config)
     pipeline_config = {
         "pipeline_id": pipeline_id,
+        "ragName": config.get("ragName"),
         "rag_type": config.get("ragType"),
         "llm_model": config.get("llmModel"),
         "embedding_model": config.get("embeddingModel"),
@@ -131,81 +121,62 @@ def _create_offline_package(pipeline_id: str, config: dict) -> dict:
         "features": config.get("features", []),
         "db_type": config.get("dbType"),
         "local_db": config.get("localDb"),
+        "autopilot": (config.get("dynamicConfig", {}) or {}).get("autopilot", {}),
     }
+    (package_dir / "pipeline_config.json").write_text(json.dumps(pipeline_config, indent=2), encoding="utf-8")
+    (package_dir / "requirements.txt").write_text("\n".join(_get_dependencies(config)) + "\n", encoding="utf-8")
 
-    config_path = os.path.join(package_dir, "pipeline_config.json")
-    with open(config_path, 'w') as f:
-        json.dump(pipeline_config, f, indent=2)
-
-    # Dependencies list
-    deps = _get_dependencies(config)
-    deps_path = os.path.join(package_dir, "requirements.txt")
-    with open(deps_path, 'w') as f:
-        f.write('\n'.join(deps))
-
-    # Run script
-    run_script = f"""#!/usr/bin/env python3
-# Auto-generated RAG pipeline runner
-# Pipeline ID: {pipeline_id}
-import json
-import os
-
-print("Loading pipeline configuration...")
-with open("pipeline_config.json") as f:
-    config = json.load(f)
-
-print(f"Pipeline Type: {{config['rag_type']}}")
-print(f"LLM: {{config['llm_model']}}")
-print(f"Ready for queries on port 8000")
-"""
-    script_path = os.path.join(package_dir, "run.py")
-    with open(script_path, 'w') as f:
-        f.write(run_script)
-
+    auto = (config.get("dynamicConfig", {}) or {}).get("autopilot", {}) or {}
+    needs_browser = bool(auto.get("vision") or auto.get("sources"))
+    browser_posix = "python -m playwright install chromium\n" if needs_browser else ""
+    browser_windows = "python -m playwright install chromium\r\n" if needs_browser else ""
+    start_py = '''from pathlib import Path\nimport sys\nimport uvicorn\nAPP = Path(__file__).resolve().parent / "app"\nsys.path.insert(0, str(APP))\nfrom main import app\nuvicorn.run(app, host="0.0.0.0", port=8010)\n'''
+    (package_dir / "start.py").write_text(start_py, encoding="utf-8")
+    (package_dir / "start.sh").write_text("#!/usr/bin/env bash\nset -e\npython -m pip install -r requirements.txt\n" + browser_posix + "python start.py\n", encoding="utf-8")
+    (package_dir / "start.bat").write_text("@echo off\r\npython -m pip install -r requirements.txt\r\n" + browser_windows + "python start.py\r\n", encoding="utf-8")
+    (package_dir / "README.txt").write_text(
+        "Customer RAG package\n\n1. Install Python 3.11/3.12.\n2. Run start.bat (Windows) or start.sh (Linux/macOS).\n"
+        "3. For local generation, keep the configured GGUF runtime available or run Ollama and select it in the chat UI.\n"
+        "4. Autopilot monitored folders must exist on this customer machine.\n5. Provider/API secrets are intentionally not exported; configure them as environment variables on the customer machine.\n",
+        encoding="utf-8",
+    )
     return {
-        "package_dir": package_dir,
-        "config_file": config_path,
-        "deps_file": deps_path,
-        "run_script": script_path,
+        "package_dir": str(package_dir),
+        "config_file": str(package_dir / "pipeline_config.json"),
+        "deps_file": str(package_dir / "requirements.txt"),
+        "run_script": str(package_dir / "start.py"),
+        "windows_start": str(package_dir / "start.bat"),
+        "unix_start": str(package_dir / "start.sh"),
     }
 
 
 def _get_dependencies(config: dict) -> list:
-    """Generate list of Python dependencies based on config."""
     deps = [
-        "fastapi",
-        "uvicorn",
-        "haystack-ai",
-        "pydantic",
+        "fastapi", "uvicorn", "pydantic", "python-multipart", "requests", "beautifulsoup4",
+        "haystack-ai==2.31.0", "sentence-transformers", "openai", "python-docx", "pdfplumber",
     ]
-
     llm = config.get("llmModel", "qwen-local")
-    if llm in ("qwen-local", "mistral-local"):
+    if llm in ("qwen-local", "mistral-local", "llama3-local", "deepseek-local"):
         deps.append("llama-cpp-python")
-    if llm == "gpt4o":
-        deps.append("openai")
     if llm == "claude35":
-        deps.append("anthropic")
+        deps += ["anthropic", "anthropic-haystack==5.15.0"]
 
-    db_type = config.get("dbType", "local")
     local_db = config.get("localDb", "chroma")
     cloud_db = config.get("cloudDb", "")
+    if local_db == "chroma": deps += ["chromadb", "chroma-haystack"]
+    if local_db == "faiss": deps += ["faiss-cpu", "faiss-haystack"]
+    if cloud_db == "qdrant": deps += ["qdrant-client", "qdrant-haystack==10.4.0"]
+    if cloud_db == "elasticsearch": deps += ["elasticsearch", "elasticsearch-haystack"]
+    if cloud_db == "pinecone": deps += ["pinecone-client", "pinecone-haystack"]
+    if cloud_db == "weaviate": deps += ["weaviate-client", "weaviate-haystack"]
 
-    if local_db == "chroma" or cloud_db == "chroma":
-        deps.append("chromadb")
-    if local_db == "faiss":
-        deps.append("faiss-cpu")
-    if cloud_db == "qdrant":
-        deps.append("qdrant-client")
-    if cloud_db == "elasticsearch":
-        deps.append("elasticsearch")
-    if cloud_db == "pinecone":
-        deps.append("pinecone-client")
-
-    embed = config.get("embeddingModel", "bge-local")
-    if embed == "bge-local":
-        deps.append("sentence-transformers")
-    if embed == "openai-ada":
-        deps.append("openai")
-
+    rag_type = config.get("ragType")
+    if rag_type == "voice": deps += ["faster-whisper", "edge-tts", "pydub"]
+    if rag_type == "crosslingual": deps += ["langdetect", "deep-translator"]
+    if rag_type == "structured": deps.append("networkx")
+    if rag_type == "multimodal" or (config.get("dynamicConfig", {}) or {}).get("autopilot", {}).get("vision"):
+        deps += ["Pillow", "pytesseract", "playwright"]
     return sorted(set(deps))
+
+
+start_runtime_supervisor()
