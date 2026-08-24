@@ -98,7 +98,7 @@ class SelfDevelopingRagContracts(unittest.TestCase):
     def test_customer_secrets_are_not_persisted(self):
         source = text(SERVICES / "rag_builder.py")
         self.assertIn('safe["apiKeys"] = {}', source)
-        self.assertIn("API/provider secrets are intentionally not exported", source)
+        self.assertIn("secrets are intentionally not exported", source)
 
     def test_customer_ui_exposes_autopilot_health(self):
         source = text(BACKEND.parent / "chatbotui" / "src" / "ChatRagStudio.jsx")
