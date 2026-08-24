@@ -14,8 +14,8 @@ import requests
 from haystack.utils import Secret
 
 logger = logging.getLogger(__name__)
-LLM_PORT = 8010
-OLLAMA_PORT = 11434
+OLLAMA_PORT = int(os.getenv("OLLAMA_PORT", "11434"))
+LOCAL_LLM_BASE_URL = os.getenv("LOCAL_LLM_BASE_URL", "http://127.0.0.1:8080/v1").rstrip("/")
 
 MODEL_CAPABILITIES: Dict[str, dict] = {
     "qwen-local": {"display_name": "Qwen local GGUF", "type": "local", "supports_tools": False, "supports_vision": False, "context_window": 4096, "requires_gpu": False, "min_vram_mb": 0},
@@ -126,7 +126,7 @@ def _openai_compatible(model: str, api_base_url: str, token: str, max_tokens: in
 
 
 def _local_gguf_generator(model: str):
-    return _openai_compatible(model, f"http://localhost:{LLM_PORT}/v1", "sk-no-key-required", max_tokens=1024)
+    return _openai_compatible(model, LOCAL_LLM_BASE_URL, "sk-no-key-required", max_tokens=1024)
 
 
 def _best_ollama_model(preferred: Optional[str] = None) -> str:
