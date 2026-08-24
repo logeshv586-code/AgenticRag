@@ -1,0 +1,444 @@
+.omnirag-premium-route {
+  position: relative;
+  min-height: 100vh;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 12%, rgba(34, 211, 238, 0.1), transparent 28%),
+    radial-gradient(circle at 84% 18%, rgba(99, 102, 241, 0.1), transparent 26%),
+    radial-gradient(circle at 58% 82%, rgba(16, 185, 129, 0.06), transparent 28%),
+    #020508;
+}
+
+.omnirag-premium-route::before,
+.omnirag-premium-route::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.omnirag-premium-route::before {
+  opacity: 0.32;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+  background-size: 54px 54px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95), transparent 82%);
+}
+
+.omnirag-premium-route::after {
+  background: linear-gradient(180deg, rgba(2, 5, 8, 0), rgba(2, 5, 8, 0.78) 76%, #020508 100%);
+}
+
+.omnirag-premium-route .omni-premium-orbit,
+.omnirag-premium-route .omni-premium-orbit::before,
+.omnirag-premium-route .omni-premium-orbit::after {
+  position: fixed;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.omnirag-premium-route .omni-premium-orbit {
+  top: 14%;
+  right: -170px;
+  width: 520px;
+  height: 520px;
+  border: 1px solid rgba(34, 211, 238, 0.08);
+  box-shadow:
+    inset 0 0 80px rgba(34, 211, 238, 0.03),
+    0 0 120px rgba(34, 211, 238, 0.035);
+  animation: omniOrbitSpin 28s linear infinite;
+  z-index: 0;
+}
+
+.omnirag-premium-route .omni-premium-orbit::before {
+  content: '';
+  inset: 72px;
+  border: 1px dashed rgba(139, 92, 246, 0.1);
+  animation: omniOrbitSpinReverse 19s linear infinite;
+}
+
+.omnirag-premium-route .omni-premium-orbit::after {
+  content: '';
+  left: 50%;
+  top: -5px;
+  width: 10px;
+  height: 10px;
+  background: #22d3ee;
+  box-shadow: 0 0 22px rgba(34, 211, 238, 0.9);
+}
+
+.omnirag-premium-route .omni-premium-scanline {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: -18vh;
+  height: 18vh;
+  pointer-events: none;
+  z-index: 2;
+  opacity: 0.22;
+  background: linear-gradient(to bottom, transparent, rgba(34, 211, 238, 0.045), transparent);
+  animation: omniScan 11s linear infinite;
+}
+
+.omnirag-premium-route > * {
+  position: relative;
+  z-index: 1;
+}
+
+.omnirag-premium-route nav {
+  position: sticky !important;
+  top: 14px;
+  z-index: 40;
+  margin-top: 8px;
+  width: min(1220px, calc(100% - 28px));
+  border: 1px solid rgba(255, 255, 255, 0.075);
+  border-radius: 24px;
+  background: rgba(3, 10, 15, 0.72);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.omnirag-premium-route .glass-panel,
+.omnirag-premium-route .glass-card {
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(255, 255, 255, 0.075) !important;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.048), rgba(255, 255, 255, 0.012)),
+    rgba(5, 13, 20, 0.66) !important;
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+}
+
+.omnirag-premium-route .glass-panel::before,
+.omnirag-premium-route .glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(125deg, rgba(34, 211, 238, 0.055), transparent 28%, transparent 68%, rgba(139, 92, 246, 0.045));
+  opacity: 0.9;
+}
+
+.omnirag-premium-route .glass-panel::after,
+.omnirag-premium-route .glass-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.45), transparent);
+  opacity: 0.55;
+}
+
+.omnirag-premium-route .glass-panel:hover,
+.omnirag-premium-route .glass-card:hover {
+  border-color: rgba(34, 211, 238, 0.15) !important;
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.33),
+    0 0 50px rgba(34, 211, 238, 0.025),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.omnirag-premium-route .shimmer-text {
+  background: linear-gradient(90deg, #f8fafc 0%, #67e8f9 24%, #818cf8 52%, #5eead4 75%, #f8fafc 100%);
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: omniShimmer 6s linear infinite;
+  filter: drop-shadow(0 0 20px rgba(34, 211, 238, 0.08));
+}
+
+.omnirag-premium-route button,
+.omnirag-premium-route a,
+.omnirag-premium-route input,
+.omnirag-premium-route textarea,
+.omnirag-premium-route select {
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.omnirag-premium-route button:not(:disabled):active {
+  transform: translateY(1px) scale(0.995);
+}
+
+.omnirag-premium-route input:focus,
+.omnirag-premium-route textarea:focus,
+.omnirag-premium-route select:focus {
+  box-shadow:
+    0 0 0 3px rgba(34, 211, 238, 0.055),
+    0 0 28px rgba(34, 211, 238, 0.04);
+}
+
+.omnirag-premium-route textarea,
+.omnirag-premium-route input,
+.omnirag-premium-route select {
+  caret-color: #67e8f9;
+}
+
+.omnirag-premium-route .scrollbar-premium {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(103, 232, 249, 0.15) transparent;
+}
+
+.omnirag-premium-route .scrollbar-premium::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, rgba(34, 211, 238, 0.22), rgba(99, 102, 241, 0.18));
+}
+
+.omnirag-premium-route main > header {
+  position: relative;
+}
+
+.omnirag-premium-route main > header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -20px;
+  width: min(430px, 76vw);
+  height: 1px;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.42), transparent);
+  opacity: 0.38;
+}
+
+.omnirag-premium-route section[id='architect'] > div:first-child {
+  transform-style: preserve-3d;
+}
+
+.omnirag-premium-route section[id='architect'] > div:first-child:hover {
+  transform: translateY(-2px);
+}
+
+.omnirag-premium-route section[id='architect'] aside > div,
+.omnirag-premium-route section[id='knowledge'] > div,
+.omnirag-premium-route section[id='autopilot'] {
+  transform: translateZ(0);
+}
+
+.omnirag-premium-route section[id='architect'] aside > div:hover,
+.omnirag-premium-route section[id='knowledge'] > div:hover,
+.omnirag-premium-route section[id='autopilot']:hover {
+  transform: translateY(-2px);
+}
+
+.omnirag-premium-route .omni-premium-statusbar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 18px auto 30px;
+  max-width: 1220px;
+}
+
+.omnirag-premium-route .omni-premium-step {
+  position: relative;
+  overflow: hidden;
+  min-height: 86px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 20px;
+  background: rgba(5, 13, 20, 0.58);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.omnirag-premium-route .omni-premium-step::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, transparent, #22d3ee, transparent);
+  opacity: 0.45;
+}
+
+.omnirag-premium-route .omni-premium-step-index {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: rgba(103, 232, 249, 0.78);
+  text-transform: uppercase;
+}
+
+.omnirag-premium-route .omni-premium-step-title {
+  margin-top: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f8fafc;
+}
+
+.omnirag-premium-route .omni-premium-step-copy {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #52525b;
+}
+
+.omnirag-premium-route .omni-premium-flow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.omnirag-premium-route .omni-premium-flow-node {
+  position: relative;
+  display: grid;
+  min-height: 70px;
+  place-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.065);
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.18);
+  color: #71717a;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.omnirag-premium-route .omni-premium-flow-node:not(:last-child)::after {
+  content: '›';
+  position: absolute;
+  right: -8px;
+  top: 50%;
+  transform: translate(50%, -50%);
+  z-index: 2;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #061018;
+  color: rgba(103, 232, 249, 0.72);
+  font-size: 18px;
+  line-height: 15px;
+}
+
+.omnirag-premium-route .omni-premium-flow-node[data-live='true'] {
+  border-color: rgba(34, 211, 238, 0.16);
+  background: rgba(34, 211, 238, 0.045);
+  color: #a5f3fc;
+  box-shadow: inset 0 0 22px rgba(34, 211, 238, 0.025);
+}
+
+.omnirag-premium-route .omni-premium-flow-node[data-live='true']::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #22d3ee;
+  box-shadow: 0 0 9px #22d3ee;
+  animation: omniPulse 1.9s ease-in-out infinite;
+}
+
+.omnirag-premium-route .omni-premium-glowline {
+  height: 1px;
+  margin-top: 16px;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.22), rgba(139, 92, 246, 0.18), transparent);
+  background-size: 200% 100%;
+  animation: omniShimmer 4.5s linear infinite;
+}
+
+@keyframes omniOrbitSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes omniOrbitSpinReverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+@keyframes omniScan {
+  0% { transform: translateY(-8vh); opacity: 0; }
+  12% { opacity: 0.18; }
+  88% { opacity: 0.18; }
+  100% { transform: translateY(128vh); opacity: 0; }
+}
+
+@keyframes omniShimmer {
+  from { background-position: 0% 50%; }
+  to { background-position: 220% 50%; }
+}
+
+@keyframes omniPulse {
+  0%, 100% { opacity: 0.42; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+@media (max-width: 1024px) {
+  .omnirag-premium-route .omni-premium-statusbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .omnirag-premium-route .omni-premium-flow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .omnirag-premium-route .omni-premium-flow-node::after {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .omnirag-premium-route nav {
+    top: 8px;
+    width: calc(100% - 16px);
+    border-radius: 18px;
+  }
+
+  .omnirag-premium-route::before {
+    background-size: 38px 38px;
+    opacity: 0.2;
+  }
+
+  .omnirag-premium-route .omni-premium-orbit {
+    width: 310px;
+    height: 310px;
+    right: -170px;
+    top: 10%;
+  }
+
+  .omnirag-premium-route .omni-premium-statusbar {
+    grid-template-columns: 1fr;
+    margin-top: 12px;
+  }
+
+  .omnirag-premium-route .omni-premium-step {
+    min-height: 74px;
+  }
+
+  .omnirag-premium-route .omni-premium-flow {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .omnirag-premium-route *,
+  .omnirag-premium-route *::before,
+  .omnirag-premium-route *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
