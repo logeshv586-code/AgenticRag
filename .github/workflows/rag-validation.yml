@@ -5,11 +5,26 @@ on:
     branches: [main, feature/self-developing-rag-autopilot]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_live_runtime:
+        description: 'Run the real 11/11 backend matrix on a prepared self-hosted runner'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rag-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   backend-contracts:
     name: Backend RAG + Autopilot contracts
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,6 +55,7 @@ jobs:
   frontend-build:
     name: Customer Autopilot UI build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: chatbotui
@@ -52,7 +68,37 @@ jobs:
           cache-dependency-path: chatbotui/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
-      - name: Lint customer route
-        run: npx eslint src/ChatRagStudio.jsx src/main.jsx --rule 'no-unused-vars: warn'
+      - name: Lint customer route with zero warnings
+        run: npx eslint src/ChatRagStudio.jsx src/main.jsx --max-warnings=0
       - name: Build complete frontend
         run: npm run build
+
+  pr-certification:
+    name: PR source + build certified
+    runs-on: ubuntu-latest
+    needs: [backend-contracts, frontend-build]
+    steps:
+      - name: Record certification gate
+        run: |
+          echo "CERTIFIED: source contracts, 11-type catalog, Autopilot contracts, secret/store safety, customer lint, and full frontend build passed."
+          echo "Runtime deployment certification is intentionally separate and must execute backend/test_all_rags.py against real model/embedding/vector services."
+
+  live-runtime-certification:
+    name: Live 11/11 runtime certification
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_live_runtime }}
+    runs-on: self-hosted
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify prepared backend is healthy
+        run: python -c "import requests; r=requests.get('http://localhost:8010/health', timeout=10); r.raise_for_status(); print(r.json())"
+      - name: Run real 11/11 build + query matrix
+        working-directory: backend
+        run: python test_all_rags.py
+      - name: Upload runtime certification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rag-runtime-certification-${{ github.sha }}
+          path: backend/test_all_rags_output.json
+          if-no-files-found: warn
