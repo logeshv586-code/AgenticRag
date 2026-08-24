@@ -73,17 +73,13 @@ jobs:
       - name: Lint customer and lightweight analytics routes with zero warnings
         run: npx eslint src/ChatRagStudio.jsx src/main.jsx src/components/RagAnalyticsDashboard.jsx --max-warnings=0
       - name: Confirm Plotly is not a runtime dependency
-        run: node -e "const p=require('./package.json'); const d=p.dependencies||{}; if(d['plotly.js']||d['react-plotly.js']) process.exit(1); console.log('PASS: no Plotly runtime dependency')"
+        run: |
+          node -e "const p=require('./package.json'); const d=p.dependencies||{}; if(d['plotly.js']||d['react-plotly.js']) process.exit(1); console.log('PASS - no Plotly runtime dependency')"
       - name: Build complete frontend
         run: npm run build
       - name: Enforce JavaScript bundle budget
-        run: >-
-          node -e "const fs=require('fs'),p=require('path');
-          const dir='dist/assets';
-          const files=fs.readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>({f,b:fs.statSync(p.join(dir,f)).size})).sort((a,b)=>b.b-a.b);
-          const largest=files[0];
-          console.log('Largest JS chunk:', largest.f, Math.round(largest.b/1024)+' KiB');
-          if(largest.b>700*1024){console.error('Bundle budget exceeded: 700 KiB');process.exit(1)}"
+        run: |
+          node -e "const fs=require('fs'),p=require('path'); const dir='dist/assets'; const files=fs.readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>({f,b:fs.statSync(p.join(dir,f)).size})).sort((a,b)=>b.b-a.b); const largest=files[0]; console.log('Largest JS chunk', largest.f, Math.round(largest.b/1024)+' KiB'); if(largest.b>700*1024){console.error('Bundle budget exceeded - 700 KiB');process.exit(1)}"
 
   pr-certification:
     name: PR source + build certified
