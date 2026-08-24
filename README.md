@@ -8,20 +8,20 @@ A customer describes the outcome in plain language, adds websites/files/server f
 
 ## Current verified release status
 
-The lightweight production pass is certified by GitHub Actions **RAG Validation Matrix run #54**:
+The lightweight production release is protected by the GitHub Actions **RAG Validation Matrix**. The latest release candidate passed every hosted source/build gate, including:
 
-- backend production modules compile successfully;
-- all 11 RAG catalog contracts pass;
-- all self-developing/Autopilot contracts pass;
-- secret and vector-store safety contracts pass;
-- production npm audit reports **0 vulnerabilities**;
-- customer and analytics lint passes with **0 warnings**;
-- Plotly is absent from runtime dependencies;
-- the complete Vite frontend builds successfully;
-- the former ~4.65 MB Plotly bundle is removed;
-- the native React/SVG analytics chunk is about **12.81 kB**;
-- the largest generated JavaScript chunk is about **242 KiB**, below the enforced **700 KiB** limit;
-- the final `PR source + build certified` gate passes.
+- backend production module compilation;
+- all 11 RAG catalog contracts;
+- all self-developing/Autopilot contracts;
+- secret and vector-store safety contracts;
+- production npm audit with **0 vulnerabilities**;
+- customer and analytics lint with **0 warnings**;
+- no Plotly runtime dependency;
+- complete Vite frontend production build;
+- removal of the former ~4.65 MB Plotly bundle;
+- native React/SVG analytics chunk of about **12.81 kB**;
+- largest generated JavaScript chunk of about **242 KiB**, below the enforced **700 KiB** limit;
+- final `PR source + build certified` gate.
 
 The real 11/11 model/vector runtime matrix remains a separate deployment certificate because it must execute against the target environment's actual model, embeddings and vector-store services.
 
