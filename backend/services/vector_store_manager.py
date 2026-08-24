@@ -1,318 +1,189 @@
+"""Truthful vector-store factory.
+
+A requested production store must either initialize successfully or fail with a clear
+error. The previous silent InMemory fallback could make a cloud deployment appear
+successful while losing persistence; that behavior is intentionally removed.
 """
-Vector Store Manager — Factory for creating and managing document stores.
-Supports ChromaDB, FAISS, Qdrant, Elasticsearch, Pinecone, Weaviate,
-Supabase, PGVector, Redis, and InMemory (fallback).
-"""
-import os
-import json
-import uuid
+from __future__ import annotations
+
 import logging
-from typing import Optional, Tuple, Union, List
+import os
+import uuid
+from pathlib import Path
+from typing import List, Tuple, Union
 
 from haystack import Document
 from haystack.document_stores.in_memory import InMemoryDocumentStore
 from haystack.document_stores.types import DuplicatePolicy
 
 logger = logging.getLogger(__name__)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+STORES_DIR = BACKEND_DIR / "data" / "stores"
+STORES_DIR.mkdir(parents=True, exist_ok=True)
 
-# ── Persistence directory for local stores ──────────────────────────
-STORES_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "stores")
-os.makedirs(STORES_DIR, exist_ok=True)
+
+def _embedding_dim(config: dict) -> int:
+    model = config.get("embeddingModel", "bge-local")
+    return {
+        "bge-local": 384,
+        "openai-ada": 1536,
+        "mistral-embed": 1024,
+    }.get(model, int((config.get("dynamicConfig", {}) or {}).get("embeddingDimension", 384)))
 
 
-# ═══════════════════════════════════════════════════════════
-#  ChromaDB Integration
-# ═══════════════════════════════════════════════════════════
-def _create_chroma_store(collection_name: str):
-    """Create a persistent ChromaDB document store."""
+def _collection(config: dict) -> str:
+    value = str(config.get("ragName") or f"rag_{uuid.uuid4().hex[:8]}")
+    return "".join(ch if ch.isalnum() or ch in "_-" else "_" for ch in value)[:120]
+
+
+def _secret(token: str | None):
+    if not token:
+        return None
+    try:
+        from haystack.utils import Secret
+        return Secret.from_token(token)
+    except Exception:
+        return token
+
+
+def _chroma(config: dict):
     try:
         from haystack_integrations.document_stores.chroma import ChromaDocumentStore
-        persist_path = os.path.join(STORES_DIR, "chroma")
-        os.makedirs(persist_path, exist_ok=True)
-        store = ChromaDocumentStore(
-            collection_name=collection_name,
-            persist_path=persist_path,
-        )
-        logger.info(f"ChromaDB store created: collection={collection_name}")
-        return store
-    except ImportError:
-        logger.warning("chroma-haystack not installed — falling back to InMemory")
-        return None
+        path = STORES_DIR / "chroma"
+        path.mkdir(parents=True, exist_ok=True)
+        return ChromaDocumentStore(collection_name=_collection(config), persist_path=str(path))
+    except Exception as exc:
+        raise RuntimeError(f"ChromaDB could not be initialized. Install chromadb + chroma-haystack. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  FAISS Integration
-# ═══════════════════════════════════════════════════════════
-def _create_faiss_store(collection_name: str):
-    """Create a FAISS-backed document store."""
+def _faiss(config: dict):
     try:
         from haystack_integrations.document_stores.faiss import FAISSDocumentStore
-        # Haystack 2.x FAISSDocumentStore is typically in-memory and then saved/loaded.
-        # It doesn't use sql_url for metadata by default in the same way 1.x did.
-        store = FAISSDocumentStore(
-            embedding_dim=384,
-        )
-        logger.info(f"FAISS store created: {collection_name} (dim=384)")
-        return store
-    except ImportError:
-        logger.warning("faiss-haystack not installed — falling back to InMemory")
-        return None
+        return FAISSDocumentStore(embedding_dim=_embedding_dim(config))
+    except Exception as exc:
+        raise RuntimeError(f"FAISS could not be initialized. Install faiss-cpu + faiss-haystack. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Qdrant Integration (Cloud)
-# ═══════════════════════════════════════════════════════════
-def _create_qdrant_store(collection_name: str, api_key: Optional[str] = None,
-                         url: str = "https://localhost:6333"):
-    """Create a Qdrant cloud document store."""
+def _qdrant(config: dict):
     try:
         from haystack_integrations.document_stores.qdrant import QdrantDocumentStore
-        store = QdrantDocumentStore(
-            url=url,
-            api_key=api_key,
-            index=collection_name,
-            embedding_dim=768,
-            recreate_index=False,
-        )
-        logger.info(f"Qdrant store created: {collection_name}")
-        return store
-    except ImportError:
-        logger.warning("qdrant-haystack not installed — falling back to InMemory")
-        return None
+        dynamic = config.get("dynamicConfig", {}) or {}
+        url = dynamic.get("qdrantUrl") or os.environ.get("QDRANT_URL")
+        token = (config.get("apiKeys", {}) or {}).get("qdrant") or os.environ.get("QDRANT_API_KEY")
+        if not url:
+            raise ValueError("Qdrant URL is required (dynamicConfig.qdrantUrl or QDRANT_URL)")
+        kwargs = {
+            "url": url,
+            "index": _collection(config),
+            "embedding_dim": _embedding_dim(config),
+            "recreate_index": False,
+            "return_embedding": True,
+        }
+        if token:
+            kwargs["api_key"] = _secret(token)
+        return QdrantDocumentStore(**kwargs)
+    except Exception as exc:
+        raise RuntimeError(f"Qdrant could not be initialized. Install qdrant-haystack and configure URL/key. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Elasticsearch Integration (Cloud)
-# ═══════════════════════════════════════════════════════════
-def _create_elasticsearch_store(index_name: str, api_key: Optional[str] = None,
-                                host: str = "http://localhost:9200"):
-    """Create an Elasticsearch document store."""
+def _elasticsearch(config: dict):
     try:
         from haystack_integrations.document_stores.elasticsearch import ElasticsearchDocumentStore
-        store = ElasticsearchDocumentStore(
-            hosts=[host],
-            index=index_name,
-        )
-        logger.info(f"Elasticsearch store created: {index_name}")
-        return store
-    except ImportError:
-        logger.warning("elasticsearch-haystack not installed — falling back to InMemory")
-        return None
+        dynamic = config.get("dynamicConfig", {}) or {}
+        host = dynamic.get("elasticsearchUrl") or os.environ.get("ELASTICSEARCH_URL")
+        if not host:
+            raise ValueError("Elasticsearch URL is required")
+        return ElasticsearchDocumentStore(hosts=[host], index=_collection(config))
+    except Exception as exc:
+        raise RuntimeError(f"Elasticsearch could not be initialized. Install elasticsearch-haystack and configure URL. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Pinecone Integration (Cloud)
-# ═══════════════════════════════════════════════════════════
-def _create_pinecone_store(index_name: str, api_key: Optional[str] = None):
-    """Create a Pinecone cloud document store."""
+def _pinecone(config: dict):
     try:
         from haystack_integrations.document_stores.pinecone import PineconeDocumentStore
-        store = PineconeDocumentStore(
-            api_key=api_key,
-            index=index_name,
-            dimension=768,
-        )
-        logger.info(f"Pinecone store created: {index_name}")
-        return store
-    except ImportError:
-        logger.warning("pinecone-haystack not installed — falling back to InMemory")
-        return None
+        token = (config.get("apiKeys", {}) or {}).get("pinecone") or os.environ.get("PINECONE_API_KEY")
+        if not token:
+            raise ValueError("Pinecone API key is required")
+        return PineconeDocumentStore(api_key=_secret(token), index=_collection(config), dimension=_embedding_dim(config))
+    except Exception as exc:
+        raise RuntimeError(f"Pinecone could not be initialized. Install pinecone-haystack and configure a key. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Weaviate Integration (Cloud)
-# ═══════════════════════════════════════════════════════════
-def _create_weaviate_store(collection_name: str, api_key: Optional[str] = None,
-                           url: str = "http://localhost:8080"):
-    """Create a Weaviate document store."""
+def _weaviate(config: dict):
     try:
         from haystack_integrations.document_stores.weaviate import WeaviateDocumentStore
-        store = WeaviateDocumentStore(
-            url=url,
-            auth_client_secret=api_key,
-            collection_settings={
-                "class": collection_name,
-            },
-        )
-        logger.info(f"Weaviate store created: {collection_name}")
-        return store
-    except ImportError:
-        logger.warning("weaviate-haystack not installed — falling back to InMemory")
-        return None
+        dynamic = config.get("dynamicConfig", {}) or {}
+        url = dynamic.get("weaviateUrl") or os.environ.get("WEAVIATE_URL")
+        if not url:
+            raise ValueError("Weaviate URL is required")
+        token = (config.get("apiKeys", {}) or {}).get("weaviate") or os.environ.get("WEAVIATE_API_KEY")
+        kwargs = {"url": url, "collection_settings": {"class": _collection(config)}}
+        if token:
+            kwargs["auth_client_secret"] = token
+        return WeaviateDocumentStore(**kwargs)
+    except Exception as exc:
+        raise RuntimeError(f"Weaviate could not be initialized. Install weaviate-haystack and configure URL/key. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Supabase Vector (pgvector via Supabase REST API)
-# ═══════════════════════════════════════════════════════════
-def _create_supabase_store(collection_name: str, api_key: Optional[str] = None,
-                           url: Optional[str] = None):
-    """
-    Create a Supabase vector store.
-    Uses the Supabase pgvector extension via REST API.
-    Local fallback: InMemoryDocumentStore.
-    """
-    try:
-        # Try Supabase-specific Haystack integration first
-        from haystack_integrations.document_stores.pgvector import PgvectorDocumentStore
-
-        # Supabase provides a PostgreSQL connection string
-        connection_str = url or os.environ.get("SUPABASE_DB_URL", "")
-        if not connection_str:
-            logger.warning("Supabase DB URL not provided — falling back to InMemory")
-            return None
-
-        store = PgvectorDocumentStore(
-            connection_string=connection_str,
-            table_name=collection_name,
-            embedding_dimension=768,
-            recreate_table=False,
-        )
-        logger.info(f"Supabase (pgvector) store created: {collection_name}")
-        return store
-    except ImportError:
-        logger.warning("pgvector-haystack not installed — falling back to InMemory")
-        return None
-    except Exception as e:
-        logger.warning(f"Supabase store creation failed: {e}")
-        return None
-
-
-# ═══════════════════════════════════════════════════════════
-#  PGVector Integration (Direct PostgreSQL)
-# ═══════════════════════════════════════════════════════════
-def _create_pgvector_store(collection_name: str, connection_string: Optional[str] = None):
-    """
-    Create a PGVector document store (direct PostgreSQL with pgvector extension).
-    Local: requires PostgreSQL with pgvector installed locally.
-    API: connect to a remote PostgreSQL instance.
-    """
+def _pgvector(config: dict):
     try:
         from haystack_integrations.document_stores.pgvector import PgvectorDocumentStore
-
-        conn_str = connection_string or os.environ.get(
-            "PGVECTOR_CONNECTION_STRING",
-            "postgresql://postgres:postgres@localhost:5432/ragdb"
-        )
-
-        store = PgvectorDocumentStore(
-            connection_string=conn_str,
-            table_name=collection_name,
-            embedding_dimension=768,
+        dynamic = config.get("dynamicConfig", {}) or {}
+        conn = dynamic.get("pgvectorUrl") or os.environ.get("PGVECTOR_CONNECTION_STRING")
+        if not conn:
+            raise ValueError("PGVector connection string is required")
+        return PgvectorDocumentStore(
+            connection_string=conn,
+            table_name=_collection(config),
+            embedding_dimension=_embedding_dim(config),
             recreate_table=False,
         )
-        logger.info(f"PGVector store created: {collection_name}")
-        return store
-    except ImportError:
-        logger.warning("pgvector-haystack not installed — falling back to InMemory")
-        return None
-    except Exception as e:
-        logger.warning(f"PGVector store creation failed: {e}")
-        return None
+    except Exception as exc:
+        raise RuntimeError(f"PGVector could not be initialized. Install pgvector-haystack and configure a connection. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Redis Vector Integration
-# ═══════════════════════════════════════════════════════════
-def _create_redis_store(collection_name: str, api_key: Optional[str] = None,
-                        url: str = "redis://localhost:6379"):
-    """
-    Create a Redis vector document store.
-    Requires Redis Stack with the RediSearch module.
-    """
+def _redis(config: dict):
     try:
-        # Try Redis-specific Haystack integration
         from haystack_integrations.document_stores.redis import RedisDocumentStore
-
-        redis_url = url or os.environ.get("REDIS_URL", "redis://localhost:6379")
-
-        store = RedisDocumentStore(
-            redis_url=redis_url,
-            index_name=collection_name,
-            embedding_dim=768,
-        )
-        logger.info(f"Redis vector store created: {collection_name}")
-        return store
-    except ImportError:
-        logger.warning("redis-haystack not installed — falling back to InMemory")
-        return None
-    except Exception as e:
-        logger.warning(f"Redis store creation failed: {e}")
-        return None
+        dynamic = config.get("dynamicConfig", {}) or {}
+        url = dynamic.get("redisUrl") or os.environ.get("REDIS_URL")
+        if not url:
+            raise ValueError("Redis URL is required")
+        return RedisDocumentStore(redis_url=url, index_name=_collection(config), embedding_dim=_embedding_dim(config))
+    except Exception as exc:
+        raise RuntimeError(f"Redis vector store could not be initialized. Install redis-haystack and configure URL. Detail: {exc}") from exc
 
 
-# ═══════════════════════════════════════════════════════════
-#  Factory
-# ═══════════════════════════════════════════════════════════
+def _make(kind: str, config: dict):
+    kind = (kind or "").lower()
+    if kind == "chroma": return _chroma(config)
+    if kind == "faiss": return _faiss(config)
+    if kind == "qdrant": return _qdrant(config)
+    if kind == "elasticsearch": return _elasticsearch(config)
+    if kind == "pinecone": return _pinecone(config)
+    if kind == "weaviate": return _weaviate(config)
+    if kind == "pgvector": return _pgvector(config)
+    if kind == "redis": return _redis(config)
+    if kind in ("memory", "inmemory"): return InMemoryDocumentStore()
+    raise ValueError(f"Unsupported vector store '{kind}'")
+
+
 def create_document_store(config: dict) -> Union[object, Tuple[object, object]]:
-    """
-    Factory: create the right document store(s) based on user config.
-
-    Returns:
-      - A single document store for cloud or local mode
-      - A tuple (cloud_store, local_store) for hybrid mode
-    """
-    db_type = config.get("dbType", "local")
-    cloud_db = config.get("cloudDb", "pinecone")
-    local_db = config.get("localDb", "chroma")
-    api_keys = config.get("apiKeys", {})
-    collection = config.get("ragName") if config.get("ragName") else f"rag_{uuid.uuid4().hex[:8]}"
-
-    cloud_store = None
-    local_store = None
-
-    # ── Cloud store ──────────────────────────────────────
-    if db_type in ("cloud", "hybrid"):
-        if cloud_db == "pinecone":
-            cloud_store = _create_pinecone_store(collection, api_keys.get("pinecone"))
-        elif cloud_db == "qdrant":
-            cloud_store = _create_qdrant_store(collection, api_keys.get("qdrant"))
-        elif cloud_db == "elasticsearch":
-            cloud_store = _create_elasticsearch_store(collection, api_keys.get("elasticsearch"))
-        elif cloud_db == "weaviate":
-            cloud_store = _create_weaviate_store(collection, api_keys.get("weaviate"))
-        elif cloud_db == "supabase":
-            cloud_store = _create_supabase_store(
-                collection,
-                api_keys.get("supabase"),
-                url=config.get("dynamicConfig", {}).get("supabaseUrl"),
-            )
-        elif cloud_db == "redis":
-            cloud_store = _create_redis_store(
-                collection,
-                api_keys.get("redis"),
-                url=config.get("dynamicConfig", {}).get("redisUrl", "redis://localhost:6379"),
-            )
-
-    # ── Local store ──────────────────────────────────────
-    if db_type in ("local", "hybrid"):
-        if local_db == "chroma":
-            local_store = _create_chroma_store(collection)
-        elif local_db == "faiss":
-            local_store = _create_faiss_store(collection)
-        elif local_db == "pgvector":
-            local_store = _create_pgvector_store(
-                collection,
-                connection_string=config.get("dynamicConfig", {}).get("pgvectorUrl"),
-            )
-
-    # ── Resolve fallback ─────────────────────────────────
-    if db_type == "hybrid":
-        cloud_store = cloud_store or InMemoryDocumentStore()
-        local_store = local_store or InMemoryDocumentStore()
-        return cloud_store, local_store
-
+    db_type = (config.get("dbType") or "local").lower()
+    if db_type == "local":
+        return _make(config.get("localDb", "chroma"), config)
     if db_type == "cloud":
-        return cloud_store or InMemoryDocumentStore()
-
-    # local or fallback
-    return local_store or InMemoryDocumentStore()
+        return _make(config.get("cloudDb", "qdrant"), config)
+    if db_type == "hybrid":
+        cloud = _make(config.get("cloudDb", "qdrant"), config)
+        local = _make(config.get("localDb", "chroma"), config)
+        return cloud, local
+    raise ValueError(f"Unsupported dbType '{db_type}'")
 
 
 def write_documents(store, documents: List[Document]):
-    """Write documents to any Haystack-compatible store."""
     try:
         store.write_documents(documents, policy=DuplicatePolicy.OVERWRITE)
-        logger.info(f"Wrote {len(documents)} documents to store")
-    except Exception as e:
-        logger.error(f"Error writing documents: {e}")
-        raise
+        logger.info("Wrote %s documents to %s", len(documents), type(store).__name__)
+    except Exception as exc:
+        raise RuntimeError(f"Writing documents to {type(store).__name__} failed: {exc}") from exc
