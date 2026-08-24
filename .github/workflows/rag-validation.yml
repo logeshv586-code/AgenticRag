@@ -2,26 +2,39 @@ name: RAG Validation Matrix
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/self-developing-rag-autopilot]
   pull_request:
     branches: [main]
 
 jobs:
   backend-contracts:
-    name: Backend RAG contracts
+    name: Backend RAG + Autopilot contracts
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Compile changed backend modules
-        run: python -m py_compile backend/services/rag_catalog.py backend/services/rag_builder.py backend/test_rag_catalog.py
+      - name: Compile production backend modules
+        run: >-
+          python -m py_compile
+          backend/services/rag_catalog.py
+          backend/services/rag_builder.py
+          backend/services/rag_autopilot.py
+          backend/services/rag_autopilot_runtime.py
+          backend/services/haystack_service.py
+          backend/services/vector_store_manager.py
+          backend/services/pipeline_modules/advanced_pipeline.py
+          backend/services/pipeline_modules/agentic_pipeline_v2.py
+          backend/test_rag_catalog.py
+          backend/test_self_developing_rag.py
       - name: Validate every supported RAG blueprint
         run: python -m unittest backend/test_rag_catalog.py -v
+      - name: Validate self-developing production contracts
+        run: python -m unittest backend/test_self_developing_rag.py -v
 
   frontend-build:
-    name: Customer UI build
+    name: Customer Autopilot UI build
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,7 +48,7 @@ jobs:
           cache-dependency-path: chatbotui/package-lock.json
       - name: Install frontend dependencies
         run: npm ci
-      - name: Lint new customer route
+      - name: Lint customer route
         run: npx eslint src/ChatRagStudio.jsx src/main.jsx --rule 'no-unused-vars: warn'
       - name: Build complete frontend
         run: npm run build
