@@ -24,14 +24,18 @@ jobs:
           backend/services/rag_autopilot_runtime.py
           backend/services/haystack_service.py
           backend/services/vector_store_manager.py
+          backend/services/llm_service.py
           backend/services/pipeline_modules/advanced_pipeline.py
           backend/services/pipeline_modules/agentic_pipeline_v2.py
           backend/test_rag_catalog.py
           backend/test_self_developing_rag.py
+          backend/test_security_contract.py
       - name: Validate every supported RAG blueprint
         run: python -m unittest backend/test_rag_catalog.py -v
       - name: Validate self-developing production contracts
         run: python -m unittest backend/test_self_developing_rag.py -v
+      - name: Validate customer secret and store safety
+        run: python -m unittest backend/test_security_contract.py -v
 
   frontend-build:
     name: Customer Autopilot UI build
