@@ -9,7 +9,7 @@ sentence-transformers
 pytesseract
 Pillow
 requests
-# The backend is implemented against Haystack 2.x. Pin the last stable 2.x release
+# Backend is implemented against Haystack 2.x. Pin the last stable 2.x release
 # so a customer install cannot silently jump to Haystack 3.x.
 haystack-ai==2.31.0
 haystack-experimental
@@ -38,6 +38,7 @@ weaviate-haystack
 
 # === LLM providers / local runtime ===
 anthropic
+anthropic-haystack==5.15.0
 llama-cpp-python
 
 # === Web + visual monitoring ===
