@@ -1,1 +1,0 @@
-Global RAG Autopilot is intentionally rendered by UnifiedEngineRoute so the full OmniRAG Engine remains the primary UI. Natural-language architecture selection is automatic; when trusted knowledge is present, build and preview run without requiring a RAG card selection.
