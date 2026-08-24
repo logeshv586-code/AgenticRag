@@ -1,33 +1,29 @@
-"""
-Pipeline Modules — Registry mapping RAG types to specialized pipeline builders.
-Each RAG type gets its own modular backend with unique components.
-"""
+"""Pipeline registry for all production RAG architectures."""
 
+from .advanced_pipeline import build_advanced_pipeline
 from .cross_lingual_pipeline import build_cross_lingual_pipeline
 from .voice_pipeline import build_voice_pipeline
 from .agentic_pipeline import build_agentic_pipeline
 from .graph_pipeline import build_graph_pipeline
 from .conversational_pipeline import build_conversational_pipeline
 
-# ═══════════════════════════════════════════════════════════
-#  Pipeline Module Registry
-# ═══════════════════════════════════════════════════════════
-
 PIPELINE_REGISTRY = {
+    "basic": build_advanced_pipeline,
+    "hybrid": build_advanced_pipeline,
+    "citation": build_advanced_pipeline,
+    "realtime": build_advanced_pipeline,
+    "personalized": build_advanced_pipeline,
+    "multimodal": build_advanced_pipeline,
     "crosslingual": build_cross_lingual_pipeline,
     "voice": build_voice_pipeline,
     "agentic": build_agentic_pipeline,
-    "structured": build_graph_pipeline,       # "structured" = Graph RAG in frontend
+    "structured": build_graph_pipeline,
     "conversational": build_conversational_pipeline,
 }
 
-# RAG types that use the standard shared pipeline (prompt-only variation)
-STANDARD_RAG_TYPES = {"basic", "hybrid", "citation", "realtime", "personalized", "multimodal"}
+# Retained for contract compatibility. Every supported type now has a specialized builder.
+STANDARD_RAG_TYPES = set()
 
 
 def get_pipeline_builder(rag_type: str):
-    """
-    Returns the specialized pipeline builder for a RAG type,
-    or None if it should use the standard shared pipeline.
-    """
     return PIPELINE_REGISTRY.get(rag_type)
