@@ -1,10 +1,6 @@
 name: RAG Validation Matrix
 
 on:
-  push:
-    branches: [main, feature/self-developing-rag-autopilot]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
       run_live_runtime:
@@ -64,8 +60,6 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: chatbotui/package-lock.json
       - name: Install reproducible frontend dependencies
         run: npm ci --no-audit --no-fund
       - name: Block high-severity production dependency findings
@@ -82,7 +76,7 @@ jobs:
           node -e "const fs=require('fs'),p=require('path'); const dir='dist/assets'; const files=fs.readdirSync(dir).filter(f=>f.endsWith('.js')).map(f=>({f,b:fs.statSync(p.join(dir,f)).size})).sort((a,b)=>b.b-a.b); const largest=files[0]; console.log('Largest JS chunk', largest.f, Math.round(largest.b/1024)+' KiB'); if(largest.b>700*1024){console.error('Bundle budget exceeded - 700 KiB');process.exit(1)}"
 
   pr-certification:
-    name: PR source + build certified
+    name: Manual source + build certification
     runs-on: ubuntu-latest
     needs: [backend-contracts, frontend-build]
     steps:
@@ -103,10 +97,11 @@ jobs:
       - name: Run real 11/11 build + query matrix
         working-directory: backend
         run: python test_all_rags.py
-      - name: Upload runtime certification report
+      - name: Upload runtime certification report temporarily
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: rag-runtime-certification-${{ github.sha }}
+          name: rag-runtime-certification-${{ github.sha }}-${{ github.run_id }}
           path: backend/test_all_rags_output.json
           if-no-files-found: warn
+          retention-days: 1
